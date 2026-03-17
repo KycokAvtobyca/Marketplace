@@ -1,0 +1,49 @@
+# --- General / System ---
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.bak
+*.swp
+# Игнорируем файл с паролями, который видно на скриншоте
+superuser.txt
+
+# --- Backend (Django) ---
+backend/venv/
+backend/.env
+backend/__pycache__/
+backend/*.py[cod]
+backend/*$py.class
+backend/db.sqlite3
+# Игнорируем медиа-файлы (фото букетов), так как они не должны быть в Git
+backend/media/
+# Игнорируем собранную статику
+backend/static/
+backend/staticfiles/
+**/__pycache__/
+**/*.py[cod]
+**/*$py.class
+# Игнорируем файлы миграций, НО оставляем __init__.py, чтобы папка считалась модулем
+**/migrations/*.py
+!**/migrations/__init__.py
+
+# --- Frontend (Next.js) ---
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+frontend/build/
+frontend/.env*
+frontend/*.tsbuildinfo
+frontend/next-env.d.ts
+frontend/npm-debug.log*
+frontend/yarn-debug.log*
+frontend/yarn-error.log*
+
+# --- IDEs / Editors ---
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# --- OS Specific ---
+.nfs*
