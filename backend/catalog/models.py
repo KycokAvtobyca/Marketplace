@@ -1,47 +1,22 @@
+import uuid
+
+from common.models import (
+    DateTimeCreateMixin,
+    DateTimeUpdateMixin,
+    SingleMainMixin,
+    SlugifiedNameMixin,
+)
 from django.conf import settings
+from django.core.exceptions import ValidationError
 from django.core.validators import (
     MaxValueValidator,
     MinLengthValidator,
 )
-from django.db import models
-from slugify import slugify
-
-
-class SlugifiedName(models.Model):
-    name = models.CharField(
-        "Название",
-        unique=True,
-        max_length=50,
-        validators=[MinLengthValidator(3)],
-    )
-    slug = models.SlugField(
-        "Слаг (для URL)", unique=True, max_length=80, blank=True
-    )
-
-    def save(self, *args, **kwargs):
-        # автосохранение и изменение
-        # if self.pk:
-        #     old_obj = self.__class__.objects.get(pk=self.pk)
-        #     if old_obj.name != self.name:
-        #         self.slug = slugify(self.name)
-        # else:
-        #     self.slug = slugify(self.name)
-
-        if not self.slug:
-            self.slug = slugify(self.name)
-
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        abstract = True
+from django.db import IntegrityError, models, transaction
 
 
 # --- Базовые справочники ---
-class Category(SlugifiedName):
+class Category(SlugifiedNameMixin):
     class Meta:
         verbose_name = "Категория"
         verbose_name_plural = "Категории"
@@ -55,9 +30,7 @@ class Brand(models.Model):
         "Описание бренда", max_length=5000, blank=True
     )
 
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+    # Добавить фотографию
 
     def __str__(self):
         return self.name
@@ -77,10 +50,6 @@ class Attribute(models.Model):
         validators=[MinLengthValidator(2)],
     )
 
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
-
     def __str__(self):
         return self.name
 
@@ -95,12 +64,12 @@ class Attribute(models.Model):
 # Конкретное значение свойства
 # Красный, XL, Кожа
 class AttributeValue(models.Model):
-    attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE)
-    value = models.CharField(max_length=50, validators=[MinLengthValidator(2)])
-
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+    attribute = models.ForeignKey(
+        Attribute, on_delete=models.CASCADE, verbose_name="Атрибут"
+    )
+    value = models.CharField(
+        "Значение атрибута", max_length=50, validators=[MinLengthValidator(2)]
+    )
 
     def __str__(self):
         return f"{self.attribute.name}: {self.value}"
@@ -116,16 +85,17 @@ class AttributeValue(models.Model):
         ]
 
 
-# Общая карточка, то что статично
-class Product(SlugifiedName):
+# Общая карточка
+class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
     description = models.TextField(
         "Описание товара",
         max_length=4000,
         blank=True,
         validators=[MinLengthValidator(10)],
     )
+    views = models.PositiveIntegerField("Просмотры", default=0, editable=False)
     category = models.ForeignKey(
-        Category, on_delete=models.CASCADE, verbose_name="Категория"
+        Category, on_delete=models.SET_NULL, null=True, verbose_name="Категория"
     )
     brand = models.ForeignKey(
         Brand,
@@ -141,27 +111,24 @@ class Product(SlugifiedName):
         verbose_name="Продавец",
         related_name="products",
     )
-    date_time_create = models.DateTimeField(
-        "Дата создания", auto_now_add=True
-    )  # Должно быть в будущем неизменяемым полем
-    date_time_update = models.DateTimeField(
-        "Дата последнего изменения", auto_now=True
-    )
+
+    # Добавить скидку
+
+    # Обновляется через DRF или админку
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Кто последний обновил",
         related_name="updated_products",
+        editable=False,
     )
     attributes = models.ManyToManyField(
         Attribute, verbose_name="Доступные атрибуты", blank=True
     )
-    # image = models.ImageField("Изображение по умолчанию", upload_to=r"products/%Y/%m/%d/", blank=True, null=True)
 
-    def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+    def __str__(self):
+        return f"{self.name} ({self.pk})"
 
     class Meta:
         verbose_name = "Товар (карточка)"
@@ -170,34 +137,69 @@ class Product(SlugifiedName):
         indexes = [
             models.Index(
                 fields=["-date_time_create"], name="product_created_idx"
-            )
+            ),
+            models.Index(
+                fields=["category", "-date_time_create"], name="cat_created_idx"
+            ),
+            models.Index(fields=["category", "brand"]),
+            models.Index(fields=["-views"], name="views_idx"),
         ]
 
 
 # Конкретная комбинация. Например: Футболка + Красная + XL.
 # SKU (Stock Keeping Unit) - единица складского учёта
-class ProductVariant(models.Model):
+class ProductVariant(SingleMainMixin):
     product = models.ForeignKey(
         Product,
-        on_delete=models.SET_NULL,
-        null=True,
+        on_delete=models.CASCADE,
         verbose_name="Товар",
         related_name="variants",
     )
     # Уникальный артикул
-    sku = models.CharField("Артикул (SKU)", max_length=50, unique=True)
+    # Добавить автогенерацию артикула
+    sku = models.CharField(
+        "Артикул (SKU)", max_length=50, unique=True, editable=False
+    )
     price = models.DecimalField("Цена", max_digits=10, decimal_places=2)
     stock = models.PositiveIntegerField(
         "Остаток на складе", validators=[MaxValueValidator(9999)]
     )
-    is_active = models.BooleanField("Активен", default=False, db_index=True)
+
+    is_active = models.BooleanField("Активен", default=False)
     attribute_values = models.ManyToManyField(
         AttributeValue, verbose_name="Характеристики варианта"
     )
 
+    def generate_unique_sku(self):
+        return uuid.uuid4().hex[:9].upper()
+
     def save(self, *args, **kwargs):
-        self.full_clean()
-        super().save(*args, **kwargs)
+        # Обертываем в транзакцию, чтобы снятие флага и сохранение произошли одновременно
+        with transaction.atomic():
+            self._handle_main_logic("product", Product)
+
+            # Блок сохранения и генерации SKU, если его нет
+            if not self.sku:
+                # Если SKU нет, генерируем с защитой от коллизий
+                saved = False
+                for _ in range(20):
+                    self.sku = self.generate_unique_sku()
+                    try:
+                        with transaction.atomic():
+                            super().save(*args, **kwargs)
+                            saved = True
+                            break
+                    except IntegrityError:
+                        self.sku = ""
+
+                if not saved:
+                    raise RuntimeError(
+                        "Не удалось сгенерировать уникальный SKU"
+                    )
+
+                return
+
+            super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.product.name} ({self.sku})"
@@ -206,49 +208,64 @@ class ProductVariant(models.Model):
         verbose_name = "Вариант товара (SKU)"
         verbose_name_plural = "Варианты товаров (SKU)"
 
-
-# Отдельная модель изображений
-class ProductImage(models.Model):
-    image = models.ImageField(
-        "Изображение", upload_to=r"products/%Y/%m/%d/"
-    )  # настроить поле
-    is_main = models.BooleanField("Главное фото", default=False)
-    product = models.ForeignKey(
-        Product,
-        on_delete=models.SET_NULL,
-        null=True,
-        verbose_name="Товар",
-        related_name="images",
-    )
-
-    # Можно не указывать и сделать общим главным фото
-    variant = models.ForeignKey(
-        ProductVariant,
-        on_delete=models.SET_NULL,
-        null=True,
-        blank=True,
-        verbose_name="Вариант (SKU)",
-        related_name="images",
-    )
-
-    # Добавить save метод или constraint для возможности одного пустого variant
-
-    def __str__(self):
-        return f"Фото для {self.product.name}"
-
-    class Meta:
-        verbose_name = "Изображение"
-        verbose_name_plural = "Изображения"
+        indexes = [
+            models.Index(fields=["is_active", "price"], name="active_price_idx")
+        ]
 
         constraints = [
             models.UniqueConstraint(
                 fields=["product"],
-                condition=models.Q(variant__isnull=True),
-                name="unique_general_image_per_product",
-            ),
+                condition=models.Q(is_main=True),
+                name="unique_main_variant_per_product",
+            )
+        ]
+
+
+# Отдельная модель изображений
+class ProductImage(SingleMainMixin):
+    # Сделать возможность на 12 фотографий и 2 видео в будущем
+    image = models.ImageField("Изображение", upload_to=r"products/%Y/%m/%d/")
+
+    # Можно не указывать и сделать общим главным фото
+    # без вариантов товара саму модель Product
+    variant = models.ForeignKey(
+        ProductVariant,
+        on_delete=models.CASCADE,
+        verbose_name="Вариант (SKU)",
+        related_name="images",
+    )
+
+    def clean(self):
+        super().clean()
+
+        # Ограничение количества фоток
+        if self._state.adding:
+            if (
+                ProductImage.objects.filter(variant_id=self.variant_id).count()
+                >= 12
+            ):
+                raise ValidationError(
+                    {"image": "Максимум 12 изображений на один вариант товара."}
+                )
+
+    def save(self, *args, **kwargs):
+        with transaction.atomic():
+            self._handle_main_logic("variant", ProductVariant)
+
+            super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"Фото для {self.variant.sku}"
+
+    class Meta:
+        verbose_name = "Изображение товара"
+        verbose_name_plural = "Изображения товаров"
+        ordering = ["-is_main", "pk"]
+
+        constraints = [
             models.UniqueConstraint(
                 fields=["variant"],
                 condition=models.Q(is_main=True),
-                name="unique_main_image",
-            ),
+                name="unique_main_image_per_variant",
+            )
         ]

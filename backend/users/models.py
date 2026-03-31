@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
@@ -44,26 +45,30 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         unique=True, region="RU", verbose_name="Номер телефона"
     )
     name = models.CharField(
-        null=True,
         blank=True,
         max_length=99,
         validators=[MinLengthValidator(2)],
         verbose_name="Имя",
     )
     last_name = models.CharField(
-        null=True,
         blank=True,
         max_length=150,
         validators=[MinLengthValidator(2)],
         verbose_name="Фамилия",
     )
+    middle_name = models.CharField(
+        blank=True,
+        max_length=150,
+        validators=[MinLengthValidator(2)],
+        verbose_name="Отчество",
+    )
     email = models.EmailField(
         null=True, blank=True, verbose_name="Электронная почта"
     )
-    address = models.TextField(null=True, blank=True, verbose_name="Адрес")
+    address = models.TextField(blank=True, verbose_name="Адрес")
     address_data = models.JSONField(
-        null=True,
         blank=True,
+        default=dict,
         help_text="Хранит fias_id, координаты, индекс и т.д.",
         verbose_name="Полная информация адреса",
     )
@@ -88,24 +93,39 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     def __str__(self):
         return str(self.phone_number)
 
+    # def clean(self):
+    #     super().clean()
+
+    #     errors = {}
+    #     if self.name and len(self.name) < 2:
+    #         errors["name"] = (
+    #             "Имя должно быть либо пустым, либо длиннее 2 символов."
+    #         )
+    #     if self.last_name and len(self.last_name) < 2:
+    #         errors["last_name"] = (
+    #             "Фамилия должна быть либо пустой, либо длиннее 2 символов."
+    #         )
+    #     if self.middle_name and len(self.middle_name) < 2:
+    #         errors["middle_name"] = (
+    #             "Отчество должно быть либо пустым, либо длиннее 2 символов."
+    #         )
+
+    #     if errors:
+    #         raise ValidationError(errors)
+
     def save(self, *args, **kwargs):
-        if self.email and self.email.strip():
-            self.email = self.email.strip().lower()
-        else:
-            self.email = None  # Жестко блокируем пустые строки и сохраняем NULL
+        self.email = (self.email or "").strip().lower() or None
 
-        if self.pk:
-            old = (
-                type(self)
-                .objects.filter(pk=self.pk)
-                .only("date_time_create")
-                .first()
-            )
+        # if self._state.adding:
+        #     old = (
+        #         type(self)
+        #         .objects.filter(pk=self.pk)
+        #         .values_list("date_time_create", flat=True).first()
+        #     )
 
-            if old and self.date_time_create != old.date_time_create:
-                raise ValueError("Поле date_time_create нельзя изменять")
+        #     if old and self.date_time_create != old.date_time_create:
+        #         raise ValueError("Поле date_time_create нельзя изменять")
 
-        self.full_clean()
         super().save(*args, **kwargs)
 
     class Meta:
@@ -118,7 +138,10 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
             # Рекомендуется делать поиск сначала по фамилии
             # из-за объединения создания двух индексов.
             # Иначе как обычный поиск
-            models.Index(fields=["last_name", "name"], name="user_name_idx"),
+            models.Index(
+                fields=["last_name", "name", "middle_name"],
+                name="user_name_idx",
+            ),
             models.Index(
                 fields=["-date_time_create"],
                 condition=models.Q(is_active=True, is_staff=True),
@@ -129,3 +152,31 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         constraints = [
             models.UniqueConstraint(Lower("email"), name="unique_lower_email")
         ]
+
+
+class UserSegment(models.Model):
+    name = models.CharField("Название сегмента", max_length=100, unique=True)
+    description = models.TextField("Описание", blank=True, max_length=500)
+
+    users = models.ManyToManyField(
+        settings.AUTH_USER_MODEL,
+        related_name="segments",
+        blank=True,
+        verbose_name="Пользователи в сегменте",
+    )
+
+    is_active = models.BooleanField("Активен", default=True)
+    is_automated = models.BooleanField(
+        "Автоматический сегмент",
+        default=False,
+        help_text="Если True, сегмент наполняется фоновыми задачами (например, рассылка)",
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+    class Meta:
+        verbose_name = "Сегмент пользователей"
+        verbose_name_plural = "Сегменты пользователей"

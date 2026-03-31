@@ -1,3 +1,15 @@
 from django.contrib import admin
 
-# Register your models here.
+from . import models
+
+admin.site.register(
+    [
+        models.Brand,
+        models.Category,
+        models.Attribute,
+        models.AttributeValue,
+        models.Product,
+        models.ProductVariant,
+        models.ProductImage,
+    ]
+)
