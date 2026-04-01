@@ -1,15 +1,21 @@
-from catalog.models import ProductVariant
 from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import (
     MaxValueValidator,
+    MinLengthValidator,
     MinValueValidator,
 )
 from django.db import models, transaction
+from django.utils.functional import cached_property
 
 
 class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "На проверке"
+        APPROVED = "APPROVED", "Одобрен"
+        REJECTED = "REJECTED", "Отклонен"
+
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -18,7 +24,7 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
         related_name="reviews",
     )
     product_variant = models.ForeignKey(
-        ProductVariant,
+        "catalog.ProductVariant",
         on_delete=models.CASCADE,
         verbose_name="Вариант товара",
         related_name="reviews",
@@ -26,16 +32,80 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
     rating = models.PositiveSmallIntegerField(
         "Оценка", validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
-    description = models.TextField("Текст отзыва", max_length=4000)
+    description = models.TextField(
+        "Текст отзыва", max_length=4000, validators=[MinLengthValidator(10)]
+    )
+    status = models.CharField(
+        "Статус модерации",
+        max_length=15,
+        choices=Status.choices,
+        default=Status.PENDING,
+        db_index=True,
+    )
+    is_verified_purchase = models.BooleanField(
+        "Купленный товар",
+        default=False,
+        help_text="Был ли товар действительно куплен этим пользователем",
+    )
+
+    # Социальная составляющая
+    useful_count = models.PositiveIntegerField("Полезно", default=0)
+    unuseful_count = models.PositiveIntegerField("Бесполезно", default=0)
+
+    @cached_property
+    def can_add_review(self):
+        """Проверяет факт покупки товара пользователем"""
+        from orders.models import Order, OrderItem
+
+        if not self.user_id or not self.product_variant_id:
+            return False
+
+        exists = OrderItem.objects.filter(
+            order__user_id=self.user_id,
+            product_variant_id=self.product_variant_id,
+            order__status=Order.Status.COMPLETED,
+        ).exists()
+
+        return exists
+
+    def validate_purchase(self):
+        """Метод для валидации покупки"""
+
+        if not self.can_add_review:
+            raise ValidationError(
+                {
+                    "product_variant": "Нельзя оставить отзыв о товаре, который вы не покупали."
+                }
+            )
+
+    # Ответ от магазина
+    # В будущем будем реализована модель ReviewMessage
+    # seller_reply = models.TextField("Ответ продавца", max_length=2000, blank=True)
+    # admin_reply = models.TextField("Ответ администрации", max_length=2000, blank=True)
+    # reply_created_at = models.DateTimeField("Дата ответа", null=True, blank=True)
 
     def __str__(self):
-        if self.user:
-            return f"Оценка {self.rating} от отзыва пользователя {self.user.phone_number}"
-        return f"Оценка {self.rating} от отзыва удаленного пользователя"
+        author = self.user_id if self.user_id else "удаленного пользователя"
+        return f"Оценка {self.rating} от {author}"
+
+    def clean(self):
+        super().clean()
+
+        if self._state.adding:
+            self.validate_purchase()
+            self.is_verified_purchase = True
+
+    def save(self, *args, **kwargs):
+        if self._state.adding:
+            self.validate_purchase()
+
+        super().save(*args, **kwargs)
 
     class Meta:
         verbose_name = "Отзыв"
         verbose_name_plural = "Отзывы"
+
+        ordering = ["-date_time_create"]
 
         constraints = [
             models.UniqueConstraint(
@@ -60,6 +130,8 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
 
 
 class ReviewImage(models.Model):
+    MAX_IMAGES_PER_REVIEW = 8
+
     review = models.ForeignKey(
         Review,
         on_delete=models.CASCADE,
@@ -73,10 +145,13 @@ class ReviewImage(models.Model):
 
     def clean(self):
         if self._state.adding and self.review_id:
-            if type(self).objects.filter(review_id=self.review_id).count() >= 9:
+            if (
+                type(self).objects.filter(review_id=self.review_id).count()
+                >= self.MAX_IMAGES_PER_REVIEW
+            ):
                 raise ValidationError(
                     {
-                        "image": "К одному отзыву можно прикрепить не более 8 изображений."
+                        "image": f"К одному отзыву можно прикрепить не более {self.MAX_IMAGES_PER_REVIEW} изображений."
                     }
                 )
 
@@ -84,24 +159,21 @@ class ReviewImage(models.Model):
     def save(self, *args, **kwargs):
         if self._state.adding and self.review_id:
             with transaction.atomic():
-                # Напрямую обращаемся к Review,
-                # чтобы не тянуть тяжелый SQL запрос
-                # Запираем дверь (Mutex)
-                Review.objects.select_for_update().get(pk=self.review_id)
-
-                # После Mutex делаем синхронизацию с бд
-                # только если объект уже существует в базе
-
-                if not self._state.adding:
-                    self.refresh_from_db()
+                # Напрямую обращаемся к Review, чтобы повесить Mutex.
+                # Оптимизация: .values('pk') не тянет тяжелые текстовые поля в память.
+                Review.objects.select_for_update().values("pk").get(
+                    pk=self.review_id
+                )
 
                 current_count = (
                     type(self).objects.filter(review_id=self.review_id).count()
                 )
 
-                if current_count >= 9:
+                if current_count >= self.MAX_IMAGES_PER_REVIEW:
                     raise ValidationError(
-                        "К одному отзыву можно прикрепить не более 8 изображений."
+                        {
+                            "image": f"К одному отзыву можно прикрепить не более {self.MAX_IMAGES_PER_REVIEW} изображений."
+                        }
                     )
 
                 super().save(*args, **kwargs)

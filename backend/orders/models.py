@@ -1,6 +1,6 @@
 from datetime import timedelta
+from decimal import Decimal
 
-from catalog.models import ProductVariant
 from common.models import (
     DateTimeCreateMixin,
     DateTimeUpdateMixin,
@@ -11,7 +11,6 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinLengthValidator, MinValueValidator
 from django.db import models
 from django.utils import timezone
-from marketing.models import Discount, PromoCode
 from phonenumber_field.modelfields import PhoneNumberField
 
 
@@ -22,7 +21,7 @@ def get_default_valid_to():
     return future_date.replace(hour=23, minute=59, second=59, microsecond=0)
 
 
-# В Корзине: total_cost — это динамический @property.
+# В Корзине: total_cost — это динамический @cached_property.
 # В Заказе: total_cost — это поле в БД (DecimalField).
 class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     class Status(models.TextChoices):
@@ -53,13 +52,15 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
         "Статус", max_length=20, choices=Status.choices, default=Status.CREATED
     )
 
+    # Товары
+    items = models.ManyToManyField(
+        "catalog.ProductVariant",
+        through="OrderItem",
+        related_name="orders",
+        verbose_name="Товары в заказе",
+    )
+
     # Контакты
-    # items = models.ManyToManyField(
-    #     ProductVariant,
-    #     through="OrderItem",
-    #     related_name="orders",
-    #     verbose_name="Элементы заказов",
-    # )
     name = models.CharField(
         "Имя получателя", max_length=99, validators=[MinLengthValidator(2)]
     )
@@ -91,20 +92,20 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
 
     # Финансы и маркетинг
     total_cost_without_sales = models.DecimalField(
-        "Сумма без скидок", max_digits=10, decimal_places=2
+        "Сумма без скидок",
+        max_digits=10,
+        decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
     )
     total_cost = models.DecimalField(
         "Итоговая стоимость",
         max_digits=10,
         decimal_places=2,
+        validators=[MinValueValidator(Decimal("0.00"))],
     )
-    # max_percentage_can_use = models.DecimalField(
-    #     "Максимальный процент скидки, применяемый к цене",
-    #     max_digits=8,
-    #     decimal_places=2,
-    # )
+
     discount = models.ForeignKey(
-        Discount,
+        "marketing.Discount",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -112,7 +113,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Акция",
     )
     promocode = models.ForeignKey(
-        PromoCode,
+        "marketing.PromoCode",
         on_delete=models.PROTECT,
         null=True,
         blank=True,
@@ -129,19 +130,44 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     )
 
     def __str__(self):
-        return f"Заказ #{self.pk} ({self.status}) - {self.phone_number}"
+        return f"Заказ #{self.pk} ({self.get_status_display()}) - {self.phone_number}"
+
+    def get_base_price_for_promocode(self):
+        """
+        Вычисляет сумму, на которую смотрит промокод.
+        Это сумма ДО вычета самого промокода, но с учетом акций.
+        """
+        base = self.total_cost_without_sales
+
+        if self.discount:
+            if self.discount.discount_percentage:
+                base -= base * self.discount.discount_percentage
+
+        return base
 
     def clean(self):
         super().clean()
 
         # Валидация маркетинга
-        if self.discount and self.promocode:
+        if self.discount_id and self.promocode_id:
             if not self.discount.can_use_with_promocode:
                 raise ValidationError(
                     {
                         "promocode": "С данной акцией нельзя использовать промокод"
                     }
                 )
+
+        if self.total_cost > self.total_cost_without_sales:
+            raise ValidationError(
+                {
+                    "total_cost": "Итоговая цена не может быть больше суммы без скидок."
+                }
+            )
+
+        if self.promocode:
+            self.promocode.can_use(
+                user=self.user, order_total=self.get_base_price_for_promocode()
+            )
 
         # Валидация логистики на уровне Python
         if self.delivery_type == self.DeliveryType.PICKUP and not self.branch:
@@ -158,6 +184,11 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
         if not self.pk:
             config = SiteConfiguration.load()
             self.max_percentage_can_use = config.max_discount_percentage
+
+        if self.promocode:
+            self.promocode.can_use(
+                user=self.user, order_total=self.get_base_price_for_promocode()
+            )
 
         super().save(*args, **kwargs)
 
@@ -200,7 +231,9 @@ class OrderItem(DateTimeCreateMixin):
         Order, on_delete=models.CASCADE, related_name="items"
     )
     product_variant = models.ForeignKey(
-        ProductVariant, on_delete=models.PROTECT, related_name="order_items"
+        "catalog.ProductVariant",
+        on_delete=models.PROTECT,
+        related_name="order_items",
     )
     quantity = models.PositiveIntegerField(
         "Количество", validators=[MinValueValidator(1)]

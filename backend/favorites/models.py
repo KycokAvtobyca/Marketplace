@@ -1,7 +1,7 @@
-from catalog.models import ProductVariant
 from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
 from django.conf import settings
 from django.db import models
+from django.utils import timezone
 
 
 class Favorite(DateTimeCreateMixin, DateTimeUpdateMixin):
@@ -12,7 +12,7 @@ class Favorite(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Пользователь",
     )
     items = models.ManyToManyField(
-        ProductVariant,
+        "catalog.ProductVariant",
         through="FavoriteItem",
         related_name="favorites",
         verbose_name="Элементы избранных",
@@ -34,16 +34,32 @@ class FavoriteItem(DateTimeCreateMixin):
         verbose_name="Избранное",
     )
     product_variant = models.ForeignKey(
-        ProductVariant, on_delete=models.CASCADE, related_name="favorite_lines"
+        "catalog.ProductVariant",
+        on_delete=models.CASCADE,
+        related_name="favorite_lines",
     )
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
         # Принудительно обновляем дату изменения избранного
-        self.favorite.save(update_fields=["date_time_update"])
+        Favorite.objects.filter(pk=self.favorite_id).update(
+            date_time_update=timezone.now()
+        )
+
+    def delete(self, *args, **kwargs):
+        # Сохраняем ID перед удалением
+        favorite_id = self.favorite_id
+
+        super().delete(*args, **kwargs)
+
+        # Обновляем дату, так как состав избранного изменился
+        if favorite_id:
+            Favorite.objects.filter(pk=favorite_id).update(
+                date_time_update=timezone.now()
+            )
 
     def __str__(self):
-        return self.product_variant.product.name
+        return str(self.product_variant)
 
     class Meta:
         verbose_name = "Элемент избранного"

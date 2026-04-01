@@ -1,4 +1,3 @@
-from catalog.models import Brand, Category, Product, ProductVariant
 from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -9,25 +8,8 @@ from django.core.validators import (
 )
 from django.db import models
 from django.utils import timezone
-from users.models import UserSegment
 
-
-class ProductTag(models.Model):
-    pass
-
-
-class MarketingQuerySet(models.QuerySet):
-    def active(self):
-        now = timezone.now()
-        # Активны те, у которых:
-        # 1. Стоит флаг is_active
-        # 2. Дата начала <= сейчас
-        # 3. Дата окончания либо не задана (null), либо >= сейчас
-        return self.filter(
-            models.Q(valid_to__isnull=True) | models.Q(valid_to__gte=now),
-            is_active=True,
-            valid_from__lte=now,
-        )
+from .managers import MarketingQuerySet
 
 
 class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
@@ -82,7 +64,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
 
     # Целевые поля
     category = models.ForeignKey(
-        Category,
+        "catalog.Category",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -90,7 +72,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         help_text="Приоритет 2",
     )
     brand = models.ForeignKey(
-        Brand,
+        "catalog.Brand",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -98,14 +80,14 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         help_text="Приоритет 3",
     )
     tag = models.ForeignKey(
-        ProductTag,
+        "catalog.ProductTag",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
         verbose_name="На тег (подборку)",
     )
     product = models.ForeignKey(
-        Product,
+        "catalog.Product",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -113,7 +95,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         help_text="Приоритет 4",
     )
     product_variant = models.ForeignKey(
-        ProductVariant,
+        "catalog.ProductVariant",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -121,7 +103,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         help_text="Приоритет 5",
     )
     segment = models.ForeignKey(
-        UserSegment,
+        "user.UserSegment",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -139,37 +121,37 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
 
     # Исключения
     excluded_categories = models.ManyToManyField(
-        Category,
+        "catalog.Category",
         blank=True,
         verbose_name="Исключить категории",
         related_name="%(class)s_excluded",
     )
     excluded_brands = models.ManyToManyField(
-        Brand,
+        "catalog.Brand",
         blank=True,
         verbose_name="Исключить бренды",
         related_name="%(class)s_excluded",
     )
     excluded_tags = models.ManyToManyField(
-        "ProductTag",
+        "catalog.ProductTag",
         blank=True,
         verbose_name="Исключить теги",
         related_name="%(class)s_excluded",
     )
     excluded_products = models.ManyToManyField(
-        Product,
+        "catalog.Product",
         blank=True,
         verbose_name="Исключить товары",
         related_name="%(class)s_excluded",
     )
     excluded_variants = models.ManyToManyField(
-        ProductVariant,
+        "catalog.ProductVariant",
         blank=True,
         verbose_name="Исключить вариации",
         related_name="%(class)s_excluded",
     )
     excluded_segments = models.ManyToManyField(
-        UserSegment,
+        "users.UserSegment",
         blank=True,
         verbose_name="Исключить сегменты",
         related_name="%(class)s_excluded",
@@ -333,8 +315,110 @@ class PromoCode(MarketingBase):
         help_text="Оставьте пустым, если используете 'Процент скидки'",
     )
 
+    def can_use_check(self, user=None, order_total=None):
+        """Проверка возможности использования"""
+
+        now = timezone.now()
+
+        not_active_err = "Промокод больше не активен."
+        doesnt_have = "Промокод не существует."
+
+        # Базовые системные проверки (самые быстрые)
+        if not self.is_active:
+            return False, not_active_err
+
+        if self.valid_from and now < self.valid_from:
+            return False, not_active_err
+
+        if self.valid_to and now > self.valid_to:
+            return False, doesnt_have
+
+        # Общий лимит использований (глобальный счетчик)
+        if self.current_usage >= self.usage_limit:
+            return (
+                False,
+                "Количество использований промокода достигло максимума.",
+            )
+
+        # Проверка суммы корзины/заказа (Инкапсуляция логики)
+        if (
+            order_total is not None
+            and self.min_amount
+            and order_total < self.min_amount
+        ):
+            return (
+                False,
+                f"Этот промокод действует при сумме от {self.min_amount} руб.",
+            )
+
+        # Проверять можно ли использовать с текущей акцией
+
+        # Персональные ограничения (User / Segment)
+        # Если в промокоде указан целевой пользователь или сегмент
+        if self.user_id or self.segment_id:
+            # Если код персональный, а пользователя нам не передали или он аноним - отказ
+            if not user or not user.is_authenticated:
+                return False, "Войдите в систему, чтобы применить промокод."
+
+            # Проверка: Личный промокод (Priority 8)
+            # Сравниваем ID напрямую, чтобы не дергать объект из базы лишний раз
+            if self.user_id and self.user_id != user.id:
+                return False, doesnt_have
+
+            # Проверка: Сегмент пользователей (Priority 7)
+            if self.segment_id:
+                # Проверяем, входит ли наш пользователь в нужный сегмент
+                # Используем .exists(), это самый быстрый способ проверить связь в БД
+                if not user.segments.filter(id=self.segment_id).exists():
+                    return False, doesnt_have
+
+        # 4. Проверка "Один раз в одни руки"
+        # Персональные промокоды нельзя использовать дважды одному и тому же человеку.
+        if user and user.is_authenticated:
+            # Импортируем модель заказа внутри метода, чтобы избежать кольцевого импорта
+            from orders.models import Order
+
+            # Если пользователь уже имеет завершенный или оплаченный заказ с этим промокодом
+            user_already_used = (
+                Order.objects.filter(user=user, promocode=self)
+                .exclude(status=Order.Status.CANCELED)
+                .values("pk")
+                .exists()
+            )
+
+            if user_already_used:
+                return False, "Вы уже использовали данный промокод."
+
+        return True, ""
+
+    def can_use(self, user=None, order_total=None):
+        """
+        Метод-обертка для вызова валидации.
+        Выбрасывает исключение, если что-то не так.
+        """
+        is_valid, err_msg = self.can_use_check(
+            user=user, order_total=order_total
+        )
+        if not is_valid:
+            raise ValidationError({"promocode": err_msg})
+
+    def use(self):
+        """Атомарное использование промокода"""
+        updated_count = (
+            type(self)
+            .objects.filter(
+                pk=self.pk, current_usage__lt=models.F("usage_limit")
+            )
+            .update(current_usage=models.F("current_usage") + 1)
+        )
+
+        return updated_count > 0
+
     def clean(self):
         super().clean()
+
+        if not self.user_id:
+            raise ValidationError({"user": "Пользователен должен быть указан."})
 
         # Гарантируем, что заполнено только что-то одно
         has_percentage = self.discount_percentage > 0
@@ -347,43 +431,6 @@ class PromoCode(MarketingBase):
 
         if not has_percentage and not has_amount:
             raise ValidationError("Укажите размер скидки (процент или сумму).")
-
-    def can_use(self, user):
-        """Проверка возможности использования"""
-
-        now = timezone.now()
-
-        if not self.is_active:
-            return False
-
-        if self.valid_from and now < self.valid_from:
-            return False
-
-        if self.valid_to and now > self.valid_to:
-            return False
-
-        if self.current_usage >= self.usage_limit:
-            return False
-        return True
-
-    def use(self):
-        """Атомарное использование промокода"""
-        # refreshed_self = type(self).objects.select_for_update().get(pk=self.pk)
-        # if refreshed_self.current_usage < refreshed_self.usage_limit:
-        #     refreshed_self.current_usage += 1
-        #     refreshed_self.save()
-        #     return True
-        # return False
-
-        updated_count = (
-            type(self)
-            .objects.filter(
-                pk=self.pk, current_usage__lt=models.F("usage_limit")
-            )
-            .update(current_usage=models.F("current_usage") + 1)
-        )
-
-        return updated_count > 0
 
     def __str__(self):
         return f"Промокод {self.code} с приоритетом {self.priority}"

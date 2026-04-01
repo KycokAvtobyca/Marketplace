@@ -1,3 +1,4 @@
+import os
 import uuid
 
 from common.models import (
@@ -13,6 +14,9 @@ from django.core.validators import (
     MinLengthValidator,
 )
 from django.db import IntegrityError, models, transaction
+from slugify import slugify
+
+from .managers import ProductVariantQuerySet
 
 
 # --- Базовые справочники ---
@@ -22,6 +26,19 @@ class Category(SlugifiedNameMixin):
         verbose_name_plural = "Категории"
 
 
+def brand_image_path(instance, filename):
+    """
+    Генерирует путь: media/brands/slug-name/filename
+    """
+
+    folder = slugify(instance.name)
+
+    if not folder:
+        folder = f"brand_{instance.pk or 'new'}"
+
+    return os.path.join("brands", folder, filename)
+
+
 class Brand(models.Model):
     name = models.CharField(
         "Бренд", max_length=50, validators=[MinLengthValidator(2)], unique=True
@@ -29,8 +46,7 @@ class Brand(models.Model):
     description = models.TextField(
         "Описание бренда", max_length=5000, blank=True
     )
-
-    # Добавить фотографию
+    image = models.ImageField("Изображение", upload_to=brand_image_path)
 
     def __str__(self):
         return self.name
@@ -112,8 +128,6 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
         related_name="products",
     )
 
-    # Добавить скидку
-
     # Обновляется через DRF или админку
     updated_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -149,6 +163,8 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
 # Конкретная комбинация. Например: Футболка + Красная + XL.
 # SKU (Stock Keeping Unit) - единица складского учёта
 class ProductVariant(SingleMainMixin):
+    objects = ProductVariantQuerySet.as_manager()
+
     product = models.ForeignKey(
         Product,
         on_delete=models.CASCADE,
@@ -169,6 +185,20 @@ class ProductVariant(SingleMainMixin):
     attribute_values = models.ManyToManyField(
         AttributeValue, verbose_name="Характеристики варианта"
     )
+
+    @property
+    def final_price(self):
+        """
+        Удобный доступ к цене.
+        Если мы вызвали .with_prices(user), берем из БД.
+        Если нет - возвращаем базовую цену.
+        """
+        return getattr(self, "discounted_price", self.price)
+
+    @property
+    def has_discount(self):
+        """Проверка для фронтенда: рисовать ли зачеркнутую цену."""
+        return self.final_price < self.price
 
     def generate_unique_sku(self):
         return uuid.uuid4().hex[:9].upper()
@@ -223,7 +253,7 @@ class ProductVariant(SingleMainMixin):
 
 # Отдельная модель изображений
 class ProductImage(SingleMainMixin):
-    # Сделать возможность на 12 фотографий и 2 видео в будущем
+    # Сделать возможность 2 видео в будущем
     image = models.ImageField("Изображение", upload_to=r"products/%Y/%m/%d/")
 
     # Можно не указывать и сделать общим главным фото
@@ -239,7 +269,7 @@ class ProductImage(SingleMainMixin):
         super().clean()
 
         # Ограничение количества фоток
-        if self._state.adding:
+        if self._state.adding and self.variant_id:
             if (
                 ProductImage.objects.filter(variant_id=self.variant_id).count()
                 >= 12
@@ -269,3 +299,7 @@ class ProductImage(SingleMainMixin):
                 name="unique_main_image_per_variant",
             )
         ]
+
+
+class ProductTag(models.Model):
+    pass

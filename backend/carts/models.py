@@ -1,4 +1,3 @@
-from catalog.models import ProductVariant
 from common.models import (
     DateTimeCreateMixin,
     DateTimeUpdateMixin,
@@ -11,7 +10,7 @@ from django.core.validators import (
 )
 from django.db import models
 from django.utils import timezone
-from marketing.models import PromoCode
+from django.utils.functional import cached_property
 
 
 class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
@@ -22,29 +21,36 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Пользователь",
     )
     promocode = models.ForeignKey(
-        PromoCode,
+        "marketing.PromoCode",
         on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="carts",
         verbose_name="Примененный промокод",
     )
+    items = models.ManyToManyField(
+        "catalog.ProductVariant",
+        through="CartItem",
+        related_name="carts",
+        verbose_name="Товары в корзине",
+    )
 
-    @property
+    # Считать также с точечной скидкой
+    @cached_property
     def total_items_price(self):
-        """Считает стоимость всех товаров без учета промокода."""
+        """Считает стоимость всех товаров без учета промокода, но с учетом всех скидок."""
         # Используем генератор, чтобы избежать лишних N+1 запросов,
         # предполагая, что корзина загружается через prefetch_related('cart_items__product_variant')
         return sum(item.total_price for item in self.cart_items.all())
 
-    @property
+    @cached_property
     def total_cost(self):
         """Считает финальную стоимость с учетом примененного промокода."""
         base_price = self.total_items_price
         if base_price <= 0:
             return 0
 
-        # Если промокод есть, и он валиден по сумме
+        # Если промокод есть и он валиден по сумме
         if self.promocode and base_price >= self.promocode.min_amount:
             # Получаем глобальный лимит
             config = SiteConfiguration.load()
@@ -62,16 +68,34 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
             # Мы не можем дать скидку больше, чем разрешено конфигом
             actual_discount = min(proposed_discount, max_discount_limit)
 
+            # Гарантируем, что цена заказа не упадет ниже 1 рубля
             return max(1, base_price - actual_discount)
 
         return base_price
 
-    # def save(self, *args, **kwargs):
-    #     if not self.pk:
-    #         config = SiteConfiguration.load()
-    #         self.max_percentage_can_use = config.max_discount_percentage
+    def clear_cache(self):
+        """Принудительный сброс закэшированных расчетов."""
+        # Проверяем, есть ли значение в кэше, чтобы не получить AttributeError
+        for prop in ["total_items_price", "total_cost"]:
+            if prop in self.__dict__:
+                del self.__dict__[prop]
 
-    #     super().save(*args, **kwargs)
+    # Финальная стоимость с учетом
+    def clean(self):
+        super().clean()
+
+        if self.promocode:
+            self.promocode.can_use(
+                user=self.user, order_total=self.total_items_price
+            )
+
+    def save(self, *args, **kwargs):
+        if self.promocode:
+            self.promocode.can_use(
+                user=self.user, order_total=self.total_items_price
+            )
+
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"Корзина {self.user.phone_number} (ID: {self.pk})"
@@ -89,7 +113,7 @@ class CartItem(DateTimeCreateMixin):
         verbose_name="Корзина",
     )
     product_variant = models.ForeignKey(
-        ProductVariant,
+        "catalog.ProductVariant",
         on_delete=models.CASCADE,
         related_name="cart_lines",
         verbose_name="Вариация товара",
@@ -98,9 +122,19 @@ class CartItem(DateTimeCreateMixin):
         "Количество", default=1, validators=[MaxValueValidator(999)]
     )
 
+    # Пример того, как нужно загружать корзину в будущем:
+    # cart = Cart.objects.prefetch_related(
+    #     Prefetch(
+    #         'cart_items__product_variant',
+    # Принудительно заставляем ORM посчитать скидки для товаров в корзине
+    #         queryset=ProductVariant.objects.with_prices(user=request.user)
+    #     )
+    # ).get(user=request.user)
+
     @property
     def total_price(self):
-        return self.quantity * self.product_variant.price
+        # Учитываем глобальные скидки
+        return self.quantity * self.product_variant.final_price
 
     def clean(self):
         super().clean()
@@ -112,22 +146,29 @@ class CartItem(DateTimeCreateMixin):
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
+
+        if self.cart:
+            self.cart.clear_cache()
+
         # Атомарно и быстро обновляем дату корзины
-        type(self.cart).objects.filter(pk=self.cart_id).update(
+        Cart.objects.filter(pk=self.cart_id).update(
             date_time_update=timezone.now()
         )
 
     def delete(self, *args, **kwargs):
+        if self.cart:
+            self.cart.clear_cache()
+
         # Сохраняем ссылки до удаления объекта
-        cart_class = type(self.cart)
         cart_id = self.cart_id
 
         super().delete(*args, **kwargs)
 
-        # Обновляем дату корзины при удалении товара
-        cart_class.objects.filter(pk=cart_id).update(
-            date_time_update=timezone.now()
-        )
+        # Обновляем дату корзины без лишних запросов за объектом
+        if cart_id:
+            Cart.objects.filter(pk=cart_id).update(
+                date_time_update=timezone.now()
+            )
 
     def __str__(self):
         return f"{self.product_variant.product.name} x {self.quantity}"

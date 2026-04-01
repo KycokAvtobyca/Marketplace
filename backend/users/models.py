@@ -90,41 +90,24 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
     USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = ["name", "last_name"]
 
+    def can_add_review(self, variant):
+        """
+        Проверяет, может ли пользователь оставить отзыв на конкретный SKU.
+        """
+
+        from orders.models import Order, OrderItem
+
+        return OrderItem.objects.filter(
+            order__user_id=self.user.id,
+            product_variant_id=variant.pk,
+            order__status=Order.Status.COMPLETED,
+        ).exists()
+
     def __str__(self):
         return str(self.phone_number)
 
-    # def clean(self):
-    #     super().clean()
-
-    #     errors = {}
-    #     if self.name and len(self.name) < 2:
-    #         errors["name"] = (
-    #             "Имя должно быть либо пустым, либо длиннее 2 символов."
-    #         )
-    #     if self.last_name and len(self.last_name) < 2:
-    #         errors["last_name"] = (
-    #             "Фамилия должна быть либо пустой, либо длиннее 2 символов."
-    #         )
-    #     if self.middle_name and len(self.middle_name) < 2:
-    #         errors["middle_name"] = (
-    #             "Отчество должно быть либо пустым, либо длиннее 2 символов."
-    #         )
-
-    #     if errors:
-    #         raise ValidationError(errors)
-
     def save(self, *args, **kwargs):
         self.email = (self.email or "").strip().lower() or None
-
-        # if self._state.adding:
-        #     old = (
-        #         type(self)
-        #         .objects.filter(pk=self.pk)
-        #         .values_list("date_time_create", flat=True).first()
-        #     )
-
-        #     if old and self.date_time_create != old.date_time_create:
-        #         raise ValueError("Поле date_time_create нельзя изменять")
 
         super().save(*args, **kwargs)
 
