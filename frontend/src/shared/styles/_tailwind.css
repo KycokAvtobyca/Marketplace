@@ -1,1 +1,8 @@
 @import "tailwindcss";
+
+@theme {
+  --color-brand-main: #4b0082;
+  --color-obsidian: #06030c;
+  --shadow-default: 0px 0px 3px 0px #06030c45;
+  --color-cream: #fffdd0;
+}

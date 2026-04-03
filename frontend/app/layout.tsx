@@ -16,9 +16,11 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className="min-h-screen flex flex-col bg-slate-50 text-slate-900">
-        <Header />
-        <main className="grow">{children}</main>
+      <body className="items-center min-h-screen flex flex-col bg-[#FFFFF0] text-slate-900">
+        <div className="max-w-5xl w-full p-3">
+          <Header />
+          <main className="grow">{children}</main>
+        </div>
       </body>
     </html>
   )
