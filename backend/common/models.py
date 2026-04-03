@@ -143,3 +143,10 @@ class SingleMainMixin(models.Model):
 
     class Meta:
         abstract = True
+
+
+class Tag(SlugifiedNameMixin):
+    is_active = models.BooleanField("Активен", default=True)
+
+    class Meta:
+        abstract = True

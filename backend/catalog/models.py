@@ -6,6 +6,7 @@ from common.models import (
     DateTimeUpdateMixin,
     SingleMainMixin,
     SlugifiedNameMixin,
+    Tag,
 )
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -17,6 +18,12 @@ from django.db import IntegrityError, models, transaction
 from slugify import slugify
 
 from .managers import ProductVariantQuerySet
+
+
+# Сделать ограничение на макс 20 тегов в формах и api
+class ProductTag(Tag):
+    def __str__(self):
+        return f"Тег продукта. {self.name}"
 
 
 # --- Базовые справочники ---
@@ -126,6 +133,9 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
         null=True,
         verbose_name="Продавец",
         related_name="products",
+    )
+    tags = models.ManyToManyField(
+        ProductTag, verbose_name="Теги продукта", blank=True
     )
 
     # Обновляется через DRF или админку
@@ -299,7 +309,3 @@ class ProductImage(SingleMainMixin):
                 name="unique_main_image_per_variant",
             )
         ]
-
-
-class ProductTag(models.Model):
-    pass

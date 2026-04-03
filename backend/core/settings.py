@@ -42,10 +42,12 @@ INSTALLED_APPS = [
     "rest_framework",
     "corsheaders",
     "phonenumber_field",
+    "django_extensions",
     "common",
-    "info",
     "users",
+    "info",
     "catalog",
+    "marketing",
     "carts",
     "orders",
     "favorites",
@@ -91,7 +93,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "eliterose",
+        "NAME": "marketplace",
         "PASSWORD": "Aq27z_D3P",
         "HOST": "127.0.0.1",
         "PORT": "5432",

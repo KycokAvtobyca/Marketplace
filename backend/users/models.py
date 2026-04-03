@@ -1,3 +1,4 @@
+from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -40,7 +41,9 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(phone_number, password, **extra_fields)
 
 
-class CustomUser(AbstractBaseUser, PermissionsMixin):
+class CustomUser(
+    AbstractBaseUser, PermissionsMixin, DateTimeCreateMixin, DateTimeUpdateMixin
+):
     phone_number = PhoneNumberField(
         unique=True, region="RU", verbose_name="Номер телефона"
     )
@@ -71,12 +74,6 @@ class CustomUser(AbstractBaseUser, PermissionsMixin):
         default=dict,
         help_text="Хранит fias_id, координаты, индекс и т.д.",
         verbose_name="Полная информация адреса",
-    )
-    date_time_create = models.DateTimeField(
-        auto_now_add=True, verbose_name="Дата создания"
-    )  # Должно быть в будущем неизменяемым полем
-    date_time_update = models.DateTimeField(
-        auto_now=True, verbose_name="Дата последнего изменения"
     )
 
     # Обязательные поля для AbstractBaseUser и PermissionsMixin

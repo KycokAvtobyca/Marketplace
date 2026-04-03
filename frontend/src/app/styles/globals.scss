@@ -1,0 +1,8 @@
+@import "../../shared/styles/_tailwind.css"; // физический импорт
+
+/* Твои глобальные стили теперь можно писать на чистом CSS */
+@layer base {
+  body {
+    @apply bg-slate-50 text-slate-900;
+  }
+}

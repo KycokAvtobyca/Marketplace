@@ -195,7 +195,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     class Meta:
         verbose_name = "Заказ"
         verbose_name_plural = "Заказы"
-        ordering = ["-created_at"]
+        ordering = ["-date_time_create"]
 
         indexes = [
             models.Index(fields=["user", "status"]),
@@ -228,7 +228,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
 
 class OrderItem(DateTimeCreateMixin):
     order = models.ForeignKey(
-        Order, on_delete=models.CASCADE, related_name="items"
+        Order, on_delete=models.CASCADE, related_name="order_items"
     )
     product_variant = models.ForeignKey(
         "catalog.ProductVariant",

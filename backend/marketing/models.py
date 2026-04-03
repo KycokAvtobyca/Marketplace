@@ -11,6 +11,40 @@ from django.utils import timezone
 
 from .managers import MarketingQuerySet
 
+MARKETING_TARGET_FIELDS = [
+    "user",
+    "segment",
+    "product_variant",
+    "product",
+    "tag",
+    "brand",
+    "category",
+]
+
+
+def get_marketing_constraints():
+    target_fields = MARKETING_TARGET_FIELDS
+
+    # Если is_global=True, все target_fields должны быть null
+    cond_global = models.Q(is_global=True)
+    for field in target_fields:
+        cond_global &= models.Q(**{f"{field}__isnull": True})
+
+    # Если is_global=False, ровно ОДИН target_field не null
+    exactly_one_check = models.Q()
+    for field in target_fields:
+        # Создаем условие, где текущее поле не null
+        cond = models.Q(**{f"{field}__isnull": False})
+
+        # А все остальные поля - null
+        for other in target_fields:
+            if other != field:
+                cond &= models.Q(**{f"{other}__isnull": True})
+
+        exactly_one_check |= cond
+
+    return cond_global | (models.Q(is_global=False) & exactly_one_check)
+
 
 class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
     class Priority(models.IntegerChoices):
@@ -26,15 +60,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
 
     # Константа со списком полей в порядке приоритета (от высшего к низшему)
     # Это позволит нам не хардкодить списки в методах
-    TARGET_FIELDS = [
-        "user",
-        "segment",
-        "product_variant",
-        "product",
-        "tag",
-        "brand",
-        "category",
-    ]
+    TARGET_FIELDS = MARKETING_TARGET_FIELDS
 
     objects = MarketingQuerySet.as_manager()
 
@@ -103,7 +129,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         help_text="Приоритет 5",
     )
     segment = models.ForeignKey(
-        "user.UserSegment",
+        "users.UserSegment",
         on_delete=models.CASCADE,
         null=True,
         blank=True,
@@ -187,6 +213,25 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
                     "Точечная скидка может быть привязана только к одному объекту (либо категория, либо товар и т.д.)."
                 )
 
+    def calculate_priority(self):
+        priority_choices = type(self).Priority
+
+        mapping = {
+            "user": priority_choices.USER,
+            "segment": priority_choices.SEGMENT,
+            "product_variant": priority_choices.VARIANT,
+            "product": priority_choices.PRODUCT,
+            "tag": priority_choices.TAG,
+            "brand": priority_choices.BRAND,
+            "category": priority_choices.CATEGORY,
+        }
+
+        # Ищем первое заполненное поле из нашего списка приоритетов
+
+        for field in self.TARGET_FIELDS:
+            if getattr(self, f"{field}_id", None):
+                return mapping.get(field)
+
     def save(self, *args, **kwargs):
         priority_choices = type(self).Priority
 
@@ -194,23 +239,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         if self.is_global:
             self.priority = priority_choices.GLOBAL
         else:
-            mapping = {
-                "user": priority_choices.USER,
-                "segment": priority_choices.SEGMENT,
-                "product_variant": priority_choices.VARIANT,
-                "product": priority_choices.PRODUCT,
-                "tag": priority_choices.TAG,
-                "brand": priority_choices.BRAND,
-                "category": priority_choices.CATEGORY,
-            }
-
-            # Ищем первое заполненное поле из нашего списка приоритетов
-            for field in self.TARGET_FIELDS:
-                if getattr(self, f"{field}_id", None):
-                    self.priority = mapping.get(field)
-                    break
-
-        super().save(*args, **kwargs)
+            self.priority = self.calculate_priority()
 
     class Meta:
         abstract = True
@@ -227,41 +256,9 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
             models.Index(fields=["is_global"], name="%(class)s_global_idx"),
         ]
 
-        # Определяем список полей, которые должны быть взаимоисключающими
-        target_fields = [
-            "category",
-            "brand",
-            "tag",
-            "product",
-            "product_variant",
-            "segment",
-            "user",
-        ]
-
-        # Если is_global=True, все target_fields должны быть null
-        cond_global = models.Q(is_global=True)
-        for field in target_fields:
-            cond_global &= models.Q(**{f"{field}__isnull": True})
-
-        # Если is_global=False, ровно ОДИН target_field не null
-        exactly_one_check = models.Q()
-        for field in target_fields:
-            # Создаем условие, где текущее поле не null
-            cond = models.Q(**{f"{field}__isnull": False})
-
-            # А все остальные поля - null
-            for other in target_fields:
-                if other != field:
-                    cond &= models.Q(**{f"{other}__isnull": True})
-
-            exactly_one_check |= cond
-
         constraints = [
             models.CheckConstraint(
-                condition=(
-                    cond_global
-                    | (models.Q(is_global=False) & exactly_one_check)
-                ),
+                condition=get_marketing_constraints(),
                 name="%(app_label)s_%(class)s_exactly_one_target",
             )
         ]
