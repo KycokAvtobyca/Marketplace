@@ -1,8 +1,5 @@
 import type { Metadata } from "next"
-import { Inter } from "next/font/google"
-// import "@/shared/styles/_tailwind.css"
 import "@/app/styles/globals.scss"
-import { Header } from "@/widgets/header"
 
 export const metadata: Metadata = {
   title: "Маркетплейс Флоппи",
@@ -16,9 +13,8 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className="items-center min-h-screen flex flex-col bg-[#FFFFF0] text-slate-900">
-        <div className="max-w-5xl w-full p-3">
-          <Header />
+      <body className="items-center min-h-screen flex flex-col bg-[#FFFFF0] text-brand-main">
+        <div className="max-w-5xl p-3 w-full relative">
           <main className="grow">{children}</main>
         </div>
       </body>

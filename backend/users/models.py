@@ -160,3 +160,17 @@ class UserSegment(models.Model):
     class Meta:
         verbose_name = "Сегмент пользователей"
         verbose_name_plural = "Сегменты пользователей"
+
+
+class SMSCode(DateTimeCreateMixin):
+    phone_number = PhoneNumberField(
+        unique=True, region="RU", verbose_name="Номер телефона"
+    )
+    code = models.CharField(max_length=6, verbose_name="СМС-код")
+
+    def __str__(self):
+        return f"СМС-код для {self.phone_number}"
+
+    class Meta:
+        verbose_name = "СМС-код"
+        verbose_name_plural = "СМС-кода"

@@ -13,7 +13,7 @@ export const SearchForm = () => {
       />
       <button
         type="submit"
-        className="bg-brand-main px-1 h-full rounded-xl rounded-l-none"
+        className="bg-brand-main cursor-pointer px-1 h-full rounded-xl rounded-l-none"
       >
         <Image src={searchIcon} alt="Поиск" width={24} height={24} />
       </button>

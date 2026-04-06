@@ -1,9 +1,6 @@
 export const HomePage = () => {
   return (
-    <section
-      aria-labelledby="heading"
-      className="flex flex-col items-center justify-center py-20 px-4 text-center"
-    >
+    <section className="flex flex-col items-center justify-center py-20 px-4 text-center">
       {/* <h1
         id="hero-heading"
         className="text-4xl font-extrabold text-blue-600 mb-6 lg:text-5xl"
@@ -15,7 +12,7 @@ export const HomePage = () => {
         + DRF бэкенда.
       </p> */}
 
-      <h1>Главная страница</h1>
+      <h2>Главная страница</h2>
     </section>
   )
 }
