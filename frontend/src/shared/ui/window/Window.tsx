@@ -23,16 +23,16 @@ export const Window: React.FC<WindowProps> = ({
 
   return (
     <Element className={`${styles.window} ${className}`} aria-label={ariaLabel}>
-      <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-2 justify-start w-full">
         <BackRedirectLine />
         {title && (
           <header>
-            <h1 className="text-2xl">{title}</h1>
+            <h1 className="text-xl">{title}</h1>
             {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
           </header>
         )}
 
-        <div>{children}</div>
+        <div className="mt-6 w-full">{children}</div>
       </div>
     </Element>
   )

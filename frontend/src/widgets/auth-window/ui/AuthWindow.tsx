@@ -7,6 +7,7 @@ export const AuthWindow = () => {
       title="Аутенфикация"
       subtitle="Пожалуйста, войдите в систему, чтобы продолжить."
       as="article"
+      className="w-full h-auto"
     >
       <AuthForm />
     </Window>

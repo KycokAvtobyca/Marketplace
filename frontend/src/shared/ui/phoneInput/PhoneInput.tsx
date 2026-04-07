@@ -15,18 +15,37 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
   const id = useId()
 
   return (
-    <div>
-      <label htmlFor="">Номер телефона</label>
+    <div className="relative w-full">
       <PatternFormat
         id={id}
         format="+7 (###) ###-##-##"
         mask="_"
         value={value}
         onValueChange={(values) => onChange?.(values.value)}
-        type="tel"
-        className={`w-full p-3 rounded-lg border transition-all outline-none bg-obsidian/3 
-          ${error ? "border-red-500" : "border-obsidian/10 focus:border-brand-main"}`}
+        placeholder=" " // Обязательно пробел, чтобы CSS сработал
+        className="peer p-2 w-full rounded-xl border-2 border-obsidian/10 bg-transparent outline-none transition-all focus:border-brand-main"
       />
+
+      <label
+        htmlFor={id}
+        className="
+          /* Базовые стили (состояние 'сверху') */
+          absolute left-2 -top-3 p-0.5 bg-default text-sm text-brand-main transition-all cursor-text
+          
+          /* Состояние 'внутри' (когда плейсхолдер виден и нет фокуса) */
+          peer-placeholder-shown:top-2
+          peer-placeholder-shown:text-base 
+          peer-placeholder-shown:text-gray-400
+          
+          /* Возврат наверх при фокусе */
+          peer-focus:-top-3
+          peer-focus:text-sm 
+          peer-focus:text-brand-main
+        "
+      >
+        Номер телефона
+      </label>
+
       {error && <span className="text-xs text-red-500">{error}</span>}
     </div>
   )

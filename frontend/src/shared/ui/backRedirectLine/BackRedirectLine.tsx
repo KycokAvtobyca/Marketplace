@@ -1,7 +1,7 @@
 "use client"
 
 import Image from "next/image"
-import leftLine from "@/shared/assets/icons/arrow-left-obsidian.svg"
+import leftLine from "@/shared/assets/icons/arrow-left-brand.svg"
 import Link from "next/link"
 import { Suspense } from "react"
 import { useSearchParams } from "next/navigation"
@@ -10,8 +10,8 @@ const BackIcon = ({ className }: { className?: string }) => (
   <Image
     src={leftLine}
     alt="Вернуться назад"
-    width={30}
-    height={30}
+    width={25}
+    height={25}
     priority
     className={className}
   />

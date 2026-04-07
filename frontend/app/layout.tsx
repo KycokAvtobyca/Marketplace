@@ -13,7 +13,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="ru">
-      <body className="items-center min-h-screen flex flex-col bg-[#FFFFF0] text-brand-main">
+      <body className="items-center min-h-screen flex flex-col bg-default text-brand-main">
         <div className="max-w-5xl p-3 w-full relative">
           <main className="grow">{children}</main>
         </div>
