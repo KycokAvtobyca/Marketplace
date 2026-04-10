@@ -1,36 +1,39 @@
 "use client"
 
 import Image from "next/image"
-import leftLine from "@/shared/assets/icons/arrow-left-brand.svg"
-import Link from "next/link"
+import close from "@/shared/assets/icons/close.svg"
 import { Suspense } from "react"
-import { useSearchParams } from "next/navigation"
+import { clsx } from "clsx"
 
 const BackIcon = ({ className }: { className?: string }) => (
   <Image
-    src={leftLine}
+    src={close}
     alt="Вернуться назад"
-    width={25}
-    height={25}
+    width={18}
+    height={18}
     priority
     className={className}
   />
 )
 
-const BackRedirectLineContent = () => {
-  const searchParams = useSearchParams()
-  const fromParam = searchParams?.get("from")
-  const isSafeFrom = fromParam?.startsWith("/")
-
-  return (
-    <Link href={(isSafeFrom ? fromParam : null) || "/"} prefetch={false}>
-      <BackIcon />
-    </Link>
-  )
+interface BackRedirectLineProps {
+  className?: string
+  logic?: () => void
 }
 
-export const BackRedirectLine = () => (
-  <Suspense fallback={<BackIcon className="opacity-70" />}>
-    <BackRedirectLineContent />
-  </Suspense>
-)
+export const BackRedirectLine: React.FC<BackRedirectLineProps> = ({
+  logic,
+  className,
+}) => {
+  // const searchParams = useSearchParams()
+  // const fromParam = searchParams?.get("from")
+  // const isSafeFrom = fromParam?.startsWith("/")
+
+  return (
+    <Suspense fallback={<BackIcon className="opacity-70 cursor-not-allowed" />}>
+      <div onClick={logic}>
+        <BackIcon className={clsx("cursor-pointer", className)} />
+      </div>
+    </Suspense>
+  )
+}
