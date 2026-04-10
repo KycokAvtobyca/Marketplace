@@ -2,7 +2,7 @@
 
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PhoneInput } from "@/shared/ui/phoneInput/PhoneInput"
+import { PhoneInput } from "@/shared/ui/phoneInput"
 import { phoneSchema, PhoneSchema } from "../model/schemas"
 import { useCooldown } from "@/shared/lib/hooks"
 
@@ -10,7 +10,8 @@ export const AuthForm: React.FC = () => {
   const {
     control,
     handleSubmit,
-    formState: { isSubmitting, isSubmitted, errors, isValid },
+    reset,
+    formState: { isSubmitting, isSubmitted, isValid },
   } = useForm<PhoneSchema>({
     resolver: zodResolver(phoneSchema),
     mode: "onChange",
@@ -19,16 +20,25 @@ export const AuthForm: React.FC = () => {
     },
   })
 
-  const { seconds, isActive, startCooldown } = useCooldown(60)
+  const { seconds, isActive, startCooldown } = useCooldown(2)
 
   const onSubmit = async (data: PhoneSchema) => {
-    // Вызов API
-    console.log("Sending SMS to: +7", data.phone)
-    startCooldown()
+    try {
+      // Вызов API
+      console.log("Sending SMS to: +7", data.phone)
+      startCooldown()
+
+      reset(data, {
+        keepIsSubmitted: false,
+        keepTouched: false,
+        keepValues: true,
+      })
+    } catch (e) {
+      console.error("Ошибка при отправке", e)
+    }
   }
 
-  const isDisabled = isSubmitting || isSubmitted || !isValid
-
+  const isDisabled = isSubmitting || !isValid || isActive
   return (
     <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col items-end">
       <Controller
@@ -49,8 +59,8 @@ export const AuthForm: React.FC = () => {
       <button
         type="submit"
         disabled={isDisabled}
-        className={`whitespace-nowrap pt-2 transition-all
-          ${isActive ? "text-gray-400 cursor-not-allowed" : "cursor-pointer"}  
+        className={`whitespace-nowrap pt-2 transition-all cursor-pointer
+         disabled:text-gray-400 disabled:cursor-not-allowed}  
         `}
       >
         {isSubmitting

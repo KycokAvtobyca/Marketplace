@@ -129,8 +129,38 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,  # Позволяем null, чтобы не было ошибок до первого сохранения
     )
 
-    def __str__(self):
-        return f"Заказ #{self.pk} ({self.get_status_display()}) - {self.phone_number}"
+    class Meta:
+        verbose_name = "Заказ"
+        verbose_name_plural = "Заказы"
+        ordering = ["-date_time_create"]
+
+        indexes = [
+            models.Index(fields=["user", "status"]),
+            models.Index(fields=["status", "delivery_type"]),
+            models.Index(fields=["phone_number"]),
+        ]
+
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(total_cost__gte=0)
+                & models.Q(total_cost_without_sales__gte=0),
+                name="check_positive_costs",
+            ),
+            # Гарантируем, что нужные поля заполнены в зависимости от типа доставки
+            models.CheckConstraint(
+                condition=(
+                    models.Q(delivery_type="PICKUP")
+                    & models.Q(branch__isnull=False)
+                    & models.Q(address__isnull=True)
+                    | (
+                        models.Q(delivery_type="COURIER")
+                        & models.Q(address__isnull=False)
+                        & models.Q(branch__isnull=True)
+                    )
+                ),
+                name="check_delivery_fields_integrity",
+            ),
+        ]
 
     def get_base_price_for_promocode(self):
         """
@@ -192,38 +222,8 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
 
         super().save(*args, **kwargs)
 
-    class Meta:
-        verbose_name = "Заказ"
-        verbose_name_plural = "Заказы"
-        ordering = ["-date_time_create"]
-
-        indexes = [
-            models.Index(fields=["user", "status"]),
-            models.Index(fields=["status", "delivery_type"]),
-            models.Index(fields=["phone_number"]),
-        ]
-
-        constraints = [
-            models.CheckConstraint(
-                condition=models.Q(total_cost__gte=0)
-                & models.Q(total_cost_without_sales__gte=0),
-                name="check_positive_costs",
-            ),
-            # Гарантируем, что нужные поля заполнены в зависимости от типа доставки
-            models.CheckConstraint(
-                condition=(
-                    models.Q(delivery_type="PICKUP")
-                    & models.Q(branch__isnull=False)
-                    & models.Q(address__isnull=True)
-                    | (
-                        models.Q(delivery_type="COURIER")
-                        & models.Q(address__isnull=False)
-                        & models.Q(branch__isnull=True)
-                    )
-                ),
-                name="check_delivery_fields_integrity",
-            ),
-        ]
+    def __str__(self):
+        return f"Заказ #{self.pk} ({self.get_status_display()}) - {self.phone_number}"
 
 
 class OrderItem(DateTimeCreateMixin):
@@ -247,16 +247,6 @@ class OrderItem(DateTimeCreateMixin):
         "Цена за 1 шт. со скидкой", max_digits=10, decimal_places=2
     )
 
-    # Только для FrontEnd
-    @property
-    def total_price(self):
-        return self.quantity * self.discounted_price_per_item
-
-    def __str__(self):
-        return (
-            f"{self.quantity} x {self.product_variant} (Заказ #{self.order_id})"
-        )
-
     class Meta:
         verbose_name = "Товар в заказе"
         verbose_name_plural = "Товары в заказах"
@@ -268,3 +258,13 @@ class OrderItem(DateTimeCreateMixin):
                 name="unique_variant_per_order",
             )
         ]
+
+    def __str__(self):
+        return (
+            f"{self.quantity} x {self.product_variant} (Заказ #{self.order_id})"
+        )
+
+    # Только для FrontEnd
+    @property
+    def total_price(self):
+        return self.quantity * self.discounted_price_per_item

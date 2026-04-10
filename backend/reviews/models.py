@@ -52,6 +52,37 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
     useful_count = models.PositiveIntegerField("Полезно", default=0)
     unuseful_count = models.PositiveIntegerField("Бесполезно", default=0)
 
+    class Meta:
+        verbose_name = "Отзыв"
+        verbose_name_plural = "Отзывы"
+
+        ordering = ["-date_time_create"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "product_variant"],
+                name="unique_user_product_variant",
+            )
+        ]
+
+        indexes = [
+            models.Index(
+                fields=["product_variant", "-date_time_create"],
+                name="review_variant_date_idx",
+            ),
+            models.Index(
+                fields=["product_variant", "rating"],
+                name="review_product_rating_idx",
+            ),
+            models.Index(
+                fields=["-date_time_create"], name="review_created_idx"
+            ),
+        ]
+
+    def __str__(self):
+        author = self.user_id if self.user_id else "удаленного пользователя"
+        return f"Оценка {self.rating} от {author}"
+
     @cached_property
     def can_add_review(self):
         """Проверяет факт покупки товара пользователем"""
@@ -84,10 +115,6 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
     # admin_reply = models.TextField("Ответ администрации", max_length=2000, blank=True)
     # reply_created_at = models.DateTimeField("Дата ответа", null=True, blank=True)
 
-    def __str__(self):
-        author = self.user_id if self.user_id else "удаленного пользователя"
-        return f"Оценка {self.rating} от {author}"
-
     def clean(self):
         super().clean()
 
@@ -100,33 +127,6 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
             self.validate_purchase()
 
         super().save(*args, **kwargs)
-
-    class Meta:
-        verbose_name = "Отзыв"
-        verbose_name_plural = "Отзывы"
-
-        ordering = ["-date_time_create"]
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["user", "product_variant"],
-                name="unique_user_product_variant",
-            )
-        ]
-
-        indexes = [
-            models.Index(
-                fields=["product_variant", "-date_time_create"],
-                name="review_variant_date_idx",
-            ),
-            models.Index(
-                fields=["product_variant", "rating"],
-                name="review_product_rating_idx",
-            ),
-            models.Index(
-                fields=["-date_time_create"], name="review_created_idx"
-            ),
-        ]
 
 
 class ReviewImage(models.Model):

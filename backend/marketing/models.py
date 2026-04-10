@@ -189,6 +189,28 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         related_name="%(class)s_excluded",
     )
 
+    class Meta:
+        abstract = True
+
+        indexes = [
+            models.Index(
+                fields=["is_active", "valid_from", "valid_to"],
+                name="%(class)s_active_idx",
+            ),
+            models.Index(
+                fields=["is_active", "priority"],
+                name="%(class)s_active_priority_idx",
+            ),
+            models.Index(fields=["is_global"], name="%(class)s_global_idx"),
+        ]
+
+        constraints = [
+            models.CheckConstraint(
+                condition=get_marketing_constraints(),
+                name="%(app_label)s_%(class)s_exactly_one_target",
+            )
+        ]
+
     def clean(self):
         super().clean()
 
@@ -241,28 +263,6 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         else:
             self.priority = self.calculate_priority()
 
-    class Meta:
-        abstract = True
-
-        indexes = [
-            models.Index(
-                fields=["is_active", "valid_from", "valid_to"],
-                name="%(class)s_active_idx",
-            ),
-            models.Index(
-                fields=["is_active", "priority"],
-                name="%(class)s_active_priority_idx",
-            ),
-            models.Index(fields=["is_global"], name="%(class)s_global_idx"),
-        ]
-
-        constraints = [
-            models.CheckConstraint(
-                condition=get_marketing_constraints(),
-                name="%(app_label)s_%(class)s_exactly_one_target",
-            )
-        ]
-
 
 class Discount(MarketingBase):
     name = models.CharField("Название акции", blank=True, max_length=99)
@@ -273,12 +273,12 @@ class Discount(MarketingBase):
         "Можно ли использовать с промокодом", default=False, blank=True
     )
 
-    def __str__(self):
-        return f"Акция {self.name} с приоритетом {self.priority}"
-
     class Meta:
         verbose_name = "Акция"
         verbose_name_plural = "Акции"
+
+    def __str__(self):
+        return f"Акция {self.name} с приоритетом {self.priority}"
 
 
 class PromoCode(MarketingBase):
@@ -311,6 +311,29 @@ class PromoCode(MarketingBase):
         validators=[MinValueValidator(1)],
         help_text="Оставьте пустым, если используете 'Процент скидки'",
     )
+
+    class Meta:
+        verbose_name = "Промокод"
+        verbose_name_plural = "Промокоды"
+
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    # ВАРИАНТ А: Есть процент, нет фиксированной суммы
+                    (
+                        models.Q(discount_percentage__gt=0)
+                        & (models.Q(amount__isnull=True) | models.Q(amount=0))
+                    )
+                    |
+                    # ВАРИАНТ Б: Нет процента, есть фиксированная сумма
+                    (models.Q(discount_percentage=0) & models.Q(amount__gt=0))
+                ),
+                name="%(app_label)s_%(class)s_exclusive_discount_type",
+            )
+        ]
+
+    def __str__(self):
+        return f"Промокод {self.code} с приоритетом {self.priority}"
 
     def can_use_check(self, user=None, order_total=None):
         """Проверка возможности использования"""
@@ -428,26 +451,3 @@ class PromoCode(MarketingBase):
 
         if not has_percentage and not has_amount:
             raise ValidationError("Укажите размер скидки (процент или сумму).")
-
-    def __str__(self):
-        return f"Промокод {self.code} с приоритетом {self.priority}"
-
-    class Meta:
-        verbose_name = "Промокод"
-        verbose_name_plural = "Промокоды"
-
-        constraints = [
-            models.CheckConstraint(
-                condition=(
-                    # ВАРИАНТ А: Есть процент, нет фиксированной суммы
-                    (
-                        models.Q(discount_percentage__gt=0)
-                        & (models.Q(amount__isnull=True) | models.Q(amount=0))
-                    )
-                    |
-                    # ВАРИАНТ Б: Нет процента, есть фиксированная сумма
-                    (models.Q(discount_percentage=0) & models.Q(amount__gt=0))
-                ),
-                name="%(app_label)s_%(class)s_exclusive_discount_type",
-            )
-        ]

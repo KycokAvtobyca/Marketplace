@@ -87,27 +87,6 @@ class CustomUser(
     USERNAME_FIELD = "phone_number"
     REQUIRED_FIELDS = ["name", "last_name"]
 
-    def can_add_review(self, variant):
-        """
-        Проверяет, может ли пользователь оставить отзыв на конкретный SKU.
-        """
-
-        from orders.models import Order, OrderItem
-
-        return OrderItem.objects.filter(
-            order__user_id=self.user.id,
-            product_variant_id=variant.pk,
-            order__status=Order.Status.COMPLETED,
-        ).exists()
-
-    def __str__(self):
-        return str(self.phone_number)
-
-    def save(self, *args, **kwargs):
-        self.email = (self.email or "").strip().lower() or None
-
-        super().save(*args, **kwargs)
-
     class Meta:
         verbose_name = "Пользователь"
         verbose_name_plural = "Пользователи"
@@ -133,6 +112,27 @@ class CustomUser(
             models.UniqueConstraint(Lower("email"), name="unique_lower_email")
         ]
 
+    def __str__(self):
+        return str(self.phone_number)
+
+    def can_add_review(self, variant):
+        """
+        Проверяет, может ли пользователь оставить отзыв на конкретный SKU.
+        """
+
+        from orders.models import Order, OrderItem
+
+        return OrderItem.objects.filter(
+            order__user_id=self.user.id,
+            product_variant_id=variant.pk,
+            order__status=Order.Status.COMPLETED,
+        ).exists()
+
+    def save(self, *args, **kwargs):
+        self.email = (self.email or "").strip().lower() or None
+
+        super().save(*args, **kwargs)
+
 
 class UserSegment(models.Model):
     name = models.CharField("Название сегмента", max_length=100, unique=True)
@@ -154,12 +154,12 @@ class UserSegment(models.Model):
 
     created_at = models.DateTimeField(auto_now_add=True)
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         verbose_name = "Сегмент пользователей"
         verbose_name_plural = "Сегменты пользователей"
+
+    def __str__(self):
+        return self.name
 
 
 class SMSCode(DateTimeCreateMixin):
@@ -168,9 +168,9 @@ class SMSCode(DateTimeCreateMixin):
     )
     code = models.CharField(max_length=6, verbose_name="СМС-код")
 
-    def __str__(self):
-        return f"СМС-код для {self.phone_number}"
-
     class Meta:
         verbose_name = "СМС-код"
         verbose_name_plural = "СМС-кода"
+
+    def __str__(self):
+        return f"СМС-код для {self.phone_number}"

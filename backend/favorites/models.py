@@ -18,12 +18,12 @@ class Favorite(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Элементы избранных",
     )
 
-    def __str__(self):
-        return f"Избранное {self.user.phone_number} ({self.pk})"
-
     class Meta:
         verbose_name = "Избранное"
         verbose_name_plural = "Избранные"
+
+    def __str__(self):
+        return f"Избранное {self.user.phone_number} ({self.pk})"
 
 
 class FavoriteItem(DateTimeCreateMixin):
@@ -38,6 +38,20 @@ class FavoriteItem(DateTimeCreateMixin):
         on_delete=models.CASCADE,
         related_name="favorite_lines",
     )
+
+    class Meta:
+        verbose_name = "Элемент избранного"
+        verbose_name_plural = "Элементы избранных товаров"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["favorite", "product_variant"],
+                name="unique_favorite_variant",
+            )
+        ]
+
+    def __str__(self):
+        return str(self.product_variant)
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -57,17 +71,3 @@ class FavoriteItem(DateTimeCreateMixin):
             Favorite.objects.filter(pk=favorite_id).update(
                 date_time_update=timezone.now()
             )
-
-    def __str__(self):
-        return str(self.product_variant)
-
-    class Meta:
-        verbose_name = "Элемент избранного"
-        verbose_name_plural = "Элементы избранных товаров"
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["favorite", "product_variant"],
-                name="unique_favorite_variant",
-            )
-        ]

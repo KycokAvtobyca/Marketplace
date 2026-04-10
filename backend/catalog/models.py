@@ -55,12 +55,12 @@ class Brand(models.Model):
     )
     image = models.ImageField("Изображение", upload_to=brand_image_path)
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         verbose_name = "Бренд"
         verbose_name_plural = "Бренды"
+
+    def __str__(self):
+        return self.name
 
 
 # Категория свойства, то что вообще бывает.
@@ -73,12 +73,12 @@ class Attribute(models.Model):
         validators=[MinLengthValidator(2)],
     )
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         verbose_name = "Атрибут"
         verbose_name_plural = "Атрибуты"
+
+    def __str__(self):
+        return self.name
 
 
 # ------
@@ -94,9 +94,6 @@ class AttributeValue(models.Model):
         "Значение атрибута", max_length=50, validators=[MinLengthValidator(2)]
     )
 
-    def __str__(self):
-        return f"{self.attribute.name}: {self.value}"
-
     class Meta:
         verbose_name = "Значение атрибута"
         verbose_name_plural = "Значения атрибутов"
@@ -106,6 +103,9 @@ class AttributeValue(models.Model):
                 fields=["attribute", "value"], name="unique_attribute_value"
             )
         ]
+
+    def __str__(self):
+        return f"{self.attribute.name}: {self.value}"
 
 
 # Общая карточка
@@ -151,9 +151,6 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
         Attribute, verbose_name="Доступные атрибуты", blank=True
     )
 
-    def __str__(self):
-        return f"{self.name} ({self.pk})"
-
     class Meta:
         verbose_name = "Товар (карточка)"
         verbose_name_plural = "Товары (карточки)"
@@ -168,6 +165,9 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
             models.Index(fields=["category", "brand"]),
             models.Index(fields=["-views"], name="views_idx"),
         ]
+
+    def __str__(self):
+        return f"{self.name} ({self.pk})"
 
 
 # Конкретная комбинация. Например: Футболка + Красная + XL.
@@ -195,6 +195,25 @@ class ProductVariant(SingleMainMixin):
     attribute_values = models.ManyToManyField(
         AttributeValue, verbose_name="Характеристики варианта"
     )
+
+    class Meta:
+        verbose_name = "Вариант товара (SKU)"
+        verbose_name_plural = "Варианты товаров (SKU)"
+
+        indexes = [
+            models.Index(fields=["is_active", "price"], name="active_price_idx")
+        ]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product"],
+                condition=models.Q(is_main=True),
+                name="unique_main_variant_per_product",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.product.name} ({self.sku})"
 
     @property
     def final_price(self):
@@ -241,25 +260,6 @@ class ProductVariant(SingleMainMixin):
 
             super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"{self.product.name} ({self.sku})"
-
-    class Meta:
-        verbose_name = "Вариант товара (SKU)"
-        verbose_name_plural = "Варианты товаров (SKU)"
-
-        indexes = [
-            models.Index(fields=["is_active", "price"], name="active_price_idx")
-        ]
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["product"],
-                condition=models.Q(is_main=True),
-                name="unique_main_variant_per_product",
-            )
-        ]
-
 
 # Отдельная модель изображений
 class ProductImage(SingleMainMixin):
@@ -274,6 +274,22 @@ class ProductImage(SingleMainMixin):
         verbose_name="Вариант (SKU)",
         related_name="images",
     )
+
+    class Meta:
+        verbose_name = "Изображение товара"
+        verbose_name_plural = "Изображения товаров"
+        ordering = ["-is_main", "pk"]
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["variant"],
+                condition=models.Q(is_main=True),
+                name="unique_main_image_per_variant",
+            )
+        ]
+
+    def __str__(self):
+        return f"Фото для {self.variant.sku}"
 
     def clean(self):
         super().clean()
@@ -293,19 +309,3 @@ class ProductImage(SingleMainMixin):
             self._handle_main_logic("variant", ProductVariant)
 
             super().save(*args, **kwargs)
-
-    def __str__(self):
-        return f"Фото для {self.variant.sku}"
-
-    class Meta:
-        verbose_name = "Изображение товара"
-        verbose_name_plural = "Изображения товаров"
-        ordering = ["-is_main", "pk"]
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["variant"],
-                condition=models.Q(is_main=True),
-                name="unique_main_image_per_variant",
-            )
-        ]

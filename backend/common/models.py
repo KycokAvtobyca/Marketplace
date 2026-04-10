@@ -35,17 +35,17 @@ class SlugifiedNameMixin(models.Model):
         "Слаг (для URL)", unique=True, max_length=80, blank=True
     )
 
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        return self.name
+
     def save(self, *args, **kwargs):
         if not self.slug:
             self.slug = slugify(self.name)
 
         super().save(*args, **kwargs)
-
-    def __str__(self):
-        return self.name
-
-    class Meta:
-        abstract = True
 
 
 class DateTimeCreateMixin(models.Model):
@@ -71,6 +71,9 @@ class SingleMainMixin(models.Model):
     """
 
     is_main = models.BooleanField("Главный", default=False)
+
+    class Meta:
+        abstract = True
 
     @transaction.atomic
     def _handle_main_logic(self, parent_field_name, parent_mode):
@@ -140,9 +143,6 @@ class SingleMainMixin(models.Model):
                         "галочку 'Главный' у другого объекта"
                     }
                 )
-
-    class Meta:
-        abstract = True
 
 
 class Tag(SlugifiedNameMixin):

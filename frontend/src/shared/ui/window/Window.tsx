@@ -1,6 +1,7 @@
 import React from "react"
-import { BackRedirectLine } from "../backRedirectLine/BackRedirectLine"
+import { BackRedirectLine } from "@/shared/ui/backRedirectLine"
 import styles from "./Window.module.scss"
+import { Overlay } from "./Overlay"
 
 export interface WindowProps {
   as?: "section" | "article"
@@ -22,18 +23,25 @@ export const Window: React.FC<WindowProps> = ({
   const Element = as
 
   return (
-    <Element className={`${styles.window} ${className}`} aria-label={ariaLabel}>
-      <div className="flex flex-col gap-2 justify-start w-full">
-        <BackRedirectLine />
-        {title && (
-          <header>
-            <h1 className="text-xl">{title}</h1>
-            {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
-          </header>
-        )}
+    <>
+      <Element
+        className={`${styles.window} ${className}`}
+        aria-label={ariaLabel}
+      >
+        <div className="flex flex-col gap-2 justify-start w-full">
+          <BackRedirectLine />
+          {title && (
+            <header>
+              <h1 className="text-xl">{title}</h1>
+              {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
+            </header>
+          )}
 
-        <div className="mt-6 w-full">{children}</div>
-      </div>
-    </Element>
+          <div className="mt-4 w-full">{children}</div>
+        </div>
+      </Element>
+
+      <Overlay />
+    </>
   )
 }

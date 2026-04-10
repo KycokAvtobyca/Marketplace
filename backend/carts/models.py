@@ -35,6 +35,13 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Товары в корзине",
     )
 
+    class Meta:
+        verbose_name = "Корзина"
+        verbose_name_plural = "Корзины"
+
+    def __str__(self):
+        return f"Корзина {self.user.phone_number} (ID: {self.pk})"
+
     # Считать также с точечной скидкой
     @cached_property
     def total_items_price(self):
@@ -97,13 +104,6 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
 
         super().save(*args, **kwargs)
 
-    def __str__(self):
-        return f"Корзина {self.user.phone_number} (ID: {self.pk})"
-
-    class Meta:
-        verbose_name = "Корзина"
-        verbose_name_plural = "Корзины"
-
 
 class CartItem(DateTimeCreateMixin):
     cart = models.ForeignKey(
@@ -130,6 +130,19 @@ class CartItem(DateTimeCreateMixin):
     #         queryset=ProductVariant.objects.with_prices(user=request.user)
     #     )
     # ).get(user=request.user)
+
+    class Meta:
+        verbose_name = "Элемент корзины"
+        verbose_name_plural = "Элементы корзины"
+
+        constraints = [
+            models.UniqueConstraint(
+                fields=["cart", "product_variant"], name="unique_cart_variant"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.product_variant.product.name} x {self.quantity}"
 
     @property
     def total_price(self):
@@ -169,16 +182,3 @@ class CartItem(DateTimeCreateMixin):
             Cart.objects.filter(pk=cart_id).update(
                 date_time_update=timezone.now()
             )
-
-    def __str__(self):
-        return f"{self.product_variant.product.name} x {self.quantity}"
-
-    class Meta:
-        verbose_name = "Элемент корзины"
-        verbose_name_plural = "Элементы корзины"
-
-        constraints = [
-            models.UniqueConstraint(
-                fields=["cart", "product_variant"], name="unique_cart_variant"
-            )
-        ]
