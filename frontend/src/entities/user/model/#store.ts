@@ -1,4 +1,4 @@
-import { api } from "@/shared/api/apiClient"
+import { api } from "@/shared/api"
 import { ROUTES } from "@/shared/config/routes"
 import { create } from "zustand"
 

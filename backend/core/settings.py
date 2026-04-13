@@ -151,6 +151,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 REST_FRAMEWORK = {
+    "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
         "rest_framework.renderers.BrowsableAPIRenderer",  # Именно он рисует страницы
@@ -161,6 +162,15 @@ REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ),
+    "DEFAULT_THROTTLE_CLASSES": [
+        "rest_framework.throttling.AnonRateThrottle",  # Включает защиту для всех анонимов во всем проекте
+        "rest_framework.throttling.UserRateThrottle",  # Включает защиту для всех залогиненных во всем проекте
+    ],
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "40/minute",
+        "user": "100/minute",
+        "sms": "1/min",
+    },
 }
 
 SIMPLE_JWT = {

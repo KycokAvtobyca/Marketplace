@@ -8,14 +8,17 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import SMSCode
+from .throttling import SMSRateThrottle
 
 
 class SendSMSView(APIView):
     permission_classes = [AllowAny]
+    throttle_classes = [SMSRateThrottle]
 
     def post(self, request):
         phone_raw = request.data.get("phone_number")
         phone_obj = to_python(phone_raw)
+        print(request, phone_raw, phone_obj)
 
         if not phone_obj or not phone_obj.is_valid():
             return Response(
@@ -25,28 +28,31 @@ class SendSMSView(APIView):
 
         phone_normalized = str(phone_obj)
 
-        last_code = SMSCode.objects.filter(
-            phone_number=phone_normalized
-        ).first()
+        # last_code = SMSCode.objects.filter(
+        #     phone_number=phone_normalized
+        # ).first()
 
-        if last_code:
-            time_passed = timezone.now() - last_code.date_time_create
+        # if last_code:
+        #     time_passed = timezone.now() - last_code.date_time_create
 
-            if time_passed < timezone.timedelta(seconds=60):
-                seconds_left = 60 - int(time_passed.total_seconds())
-                return Response(
-                    {
-                        "error": f"Следующий код можно запросить через {seconds_left} сек."
-                    },
-                    status=status.HTTP_429_TOO_MANY_REQUESTS,
-                )
+        #     if time_passed < timezone.timedelta(seconds=60):
+        #         seconds_left = 60 - int(time_passed.total_seconds())
+        #         return Response(
+        #             {
+        #                 "error": f"Следующий код можно запросить через {seconds_left} сек."
+        #             },
+        #             status=status.HTTP_429_TOO_MANY_REQUESTS,
+        #         )
 
-            last_code.delete()
+        # last_code.delete()
 
         code = f"{random.randint(0, 999999):06d}"
 
-        SMSCode.objects.filter(phone_number=phone_normalized).delete()
+        # Удаляем истекшие смс-кода
+        expiry_time = timezone.now() - timezone.timedelta(minutes=1)
+        SMSCode.objects.filter(date_time_create__lt=expiry_time).delete()
 
+        # Создаем смс-код
         SMSCode.objects.create(phone_number=phone_normalized, code=code)
 
         print("\n" + "=" * 30)

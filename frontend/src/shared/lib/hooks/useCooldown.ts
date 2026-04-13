@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react"
 interface CooldownResult {
   seconds: number
   isActive: boolean
-  startCooldown: () => void
+  startCooldown: (customSeconds?: number) => void
 }
 
 export const useCooldown = (initialSeconds: number = 60): CooldownResult => {
@@ -19,9 +19,12 @@ export const useCooldown = (initialSeconds: number = 60): CooldownResult => {
     return () => clearInterval(timer)
   }, [seconds])
 
-  const startCooldown = useCallback(() => {
-    setSeconds(initialSeconds)
-  }, [initialSeconds])
+  const startCooldown = useCallback(
+    (customSeconds?: number) => {
+      setSeconds(customSeconds ?? initialSeconds)
+    },
+    [initialSeconds],
+  )
 
   return {
     seconds: seconds,

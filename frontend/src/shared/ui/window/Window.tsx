@@ -49,7 +49,7 @@ export const Window: React.FC<WindowProps> = ({
               {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
             </header>
           )}
-          <div className="mt-4 w-full">{children}</div>
+          <div className="mt-3 w-full">{children}</div>
         </div>
       </Element>
       <Overlay toggleWindow={toggleWindow} />

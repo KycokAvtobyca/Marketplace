@@ -3,12 +3,14 @@ import { useId } from "react"
 
 interface PhoneInputProps {
   value?: string
+  onBlur?: () => void
   onChange?: (val: string) => void
   error?: string
 }
 
 export const PhoneInput: React.FC<PhoneInputProps> = ({
   value,
+  onBlur,
   onChange,
   error,
 }) => {
@@ -21,6 +23,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         format="+7 (###) ###-##-##"
         mask="_"
         value={value}
+        onBlur={onBlur}
         onValueChange={(values) => onChange?.(values.value)}
         placeholder=" " // Обязательно пробел, чтобы CSS сработал
         className="peer p-2 w-full rounded-xl border-2 border-obsidian/10 bg-transparent outline-none transition-all focus:border-brand-main"
@@ -46,7 +49,7 @@ export const PhoneInput: React.FC<PhoneInputProps> = ({
         Номер телефона
       </label>
 
-      {error && <span className="text-xs text-red-500">{error}</span>}
+      {error && <span className="text-sm text-red-500">{error}</span>}
     </div>
   )
 }
