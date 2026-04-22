@@ -1,5 +1,3 @@
-import { useAuthStore } from "@/entities/authWindow/model/store"
-
 interface OverlayProps {
   className?: string
   toggleWindow?: () => void

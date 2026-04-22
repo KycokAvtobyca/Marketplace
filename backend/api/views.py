@@ -2,13 +2,18 @@ from django.conf import settings
 from rest_framework_simplejwt.views import TokenObtainPairView
 from users.serializers import HybridTokenSerializer
 
+from .throttling import AuthTokenByPhone, AuthTokenIPThrottle
+
 
 class HybridTokenObtainView(TokenObtainPairView):
     serializer_class = HybridTokenSerializer
+    throttle_classes = [AuthTokenByPhone, AuthTokenIPThrottle]
 
     def post(self, request, *args, **kwargs):
         # Он внутри себя создаст экземпляр HybridTokenSerializer,
         # вызовет validate() и вернет Response с токенами в JSON.
+        print(request.data)
+
         response = super().post(request, *args, **kwargs)
 
         if response.status_code == 200:

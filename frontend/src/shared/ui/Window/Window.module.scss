@@ -1,0 +1,6 @@
+@reference "../../../shared/styles/_tailwind.css";
+
+.window {
+  @apply overflow-auto min-w-default top-1/2 left-1/2 z-50 -translate-1/2 fixed flex justify-between items-start p-4 flex-col rounded-xl;
+  box-shadow: 0px 0px 6px -1px #06030c8a;
+}

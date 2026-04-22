@@ -1,8 +1,14 @@
 "use client"
 
-import { useForm, Controller } from "react-hook-form"
+import {
+  useForm,
+  Controller,
+  FormProvider,
+  UseFormSetError,
+  FieldValues,
+} from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { PhoneInput } from "@/shared/ui/phoneInput"
+import { PhoneInput } from "@/shared/ui/PhoneInput"
 import {
   codeSchema,
   CodeSchema,
@@ -10,17 +16,35 @@ import {
   PhoneSchema,
 } from "../model/schemas"
 import { useCooldown } from "@/shared/lib/hooks"
-import { api } from "@/shared/api"
-import { ROUTES } from "@/shared/config/routes"
-import axios from "axios"
-import { errorHandler, ResponseData } from "@/shared/lib/utils/errorHandler"
-import { JSX, useEffect, useState } from "react"
+import { errorHandler } from "@/shared/lib/utils/errorHandler"
+import { JSX, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
+import styles from "./AuthForm.module.scss"
+import { ApiAction, useAuthStore } from "@/entities/auth"
+import { THROTTLES } from "@/shared/config/throttles"
+import { OtpInput } from "@/shared/ui/OtpInput"
 
-export const AuthForm: React.FC = () => {
+type Props = {
+  isCodeStep: boolean
+  setIsCodeStep: (v: boolean) => void
+  setSwitchBackToSMS: (v: boolean) => void
+}
+
+export const AuthForm: React.FC<Props> = ({
+  isCodeStep,
+  setIsCodeStep,
+  setSwitchBackToSMS,
+}) => {
   // 1. Состояния UI
   const [isTyping, setIsTyping] = useState(false)
-  const [isCodeSent, setIsCodeSent] = useState(false)
+
+  // const { isAuth, isCodeSent, isLoading } = useAuthStore(
+  //   useShallow((state) => ({
+  //     isAuth: state.isAuth,
+  //     isCodeSent: state.isCodeSent,
+  //     isLoading: state.isLoading,
+  //   })),
+  // )
 
   // 2. Форма №1: номер телефона
   const phoneForm = useForm<PhoneSchema>({
@@ -48,72 +72,200 @@ export const AuthForm: React.FC = () => {
   const codeForm = useForm<CodeSchema>({
     resolver: zodResolver(codeSchema),
     mode: "onChange",
+    defaultValues: {
+      sms_code: "",
+    },
   })
 
   const {
+    // register, // Вручную вставляем через setValue
     handleSubmit: handleCodeSubmit,
-    setValue: setCodeValue,
-    formState: { errors: codeErrors, isSubmitting: isVerifying },
+    setError: setCodeError,
+    clearErrors: clearCodeErrors,
+    trigger: triggerCode,
+    formState: {
+      errors: codeErrors,
+      isSubmitting: isCodeSubmitting,
+      isValid: isCodeValid,
+    },
   } = codeForm
 
-  // 4. Таймер
-  const { seconds, isActive, startCooldown } = useCooldown(60)
+  // 4. Таймеры
+  const {
+    seconds: secondsPhone,
+    isActive: isActivePhone,
+    startCooldown: startCooldownPhone,
+  } = useCooldown(THROTTLES.PHONE)
+  const {
+    seconds: secondsCode,
+    isActive: isActiveCode,
+    startCooldown: startCooldownCode,
+  } = useCooldown(THROTTLES.AUTH)
 
   // 5. Эффекты. Очищаем глобальные ошибки после таймера
   useEffect(() => {
-    if (!isActive) {
-      clearPhoneErrors("root")
+    if (!isActivePhone) {
+      clearPhoneErrors()
       triggerPhone()
     }
-  }, [isActive, clearPhoneErrors, triggerPhone])
+  }, [isActivePhone, clearPhoneErrors, triggerPhone])
+
+  const isFirstRender = useRef(true)
+  useEffect(() => {
+    if (isFirstRender.current) {
+      isFirstRender.current = false
+      return
+    }
+
+    // if (!isActiveCode) {
+    //   clearCodeErrors()
+    //   // triggerCode()
+    // }
+  }, [isActiveCode, clearCodeErrors, triggerCode])
 
   // 6. Обработчики событий
 
+  const errorFromAPISet = <T extends FieldValues>(
+    result: ApiAction,
+    setError: UseFormSetError<T>,
+    formData: T,
+    startCooldown: (customSeconds?: number | undefined) => void,
+    throttleSecondsLeft?: number,
+  ) => {
+    console.log("Ошибка errorFromAPISet", result.error)
+
+    const secondsLeft = errorHandler(result.error, setError, formData)
+
+    startCooldown(secondsLeft || throttleSecondsLeft || THROTTLES.PHONE)
+  }
+
   // Отправка смс
   const onSubmitPhoneNumber = async (data: PhoneSchema) => {
-    try {
-      const { phone_number } = data
+    // Отправляем запрос на api
+    const result = await useAuthStore.getState().sendSms(data.phone_number)
 
-      const response = await api.post(ROUTES.API_AUTH_SEND_SMS, {
-        phone_number: phone_number,
+    // При ошибке вызываем обработчик и выходим
+    if (!result.success) {
+      errorFromAPISet(
+        result,
+        setPhoneError,
+        phoneForm.getValues(),
+        startCooldownPhone,
+        THROTTLES.PHONE,
+      )
+      // console.log("Ошибка 1", result.error)
+
+      // const secondsLeft = errorHandler(
+      //   result.error,
+      //   setPhoneError,
+      //   phoneForm.getValues(),
+      // )
+
+      // startCooldownPhone(secondsLeft || THROTTLES.PHONE)
+
+      // return
+    }
+
+    // Запускаем cooldown, если не было ошибки
+    startCooldownPhone(THROTTLES.PHONE)
+
+    // Если все успешно, то переходим на смс-код
+    // useAuthWindowStore.getState().setIsPhonePage(false)
+    setIsCodeStep(true)
+
+    // Ресетим все
+    phoneForm.reset(undefined, {
+      keepIsSubmitted: false,
+      keepTouched: false,
+      keepValues: true,
+    })
+    triggerPhone()
+  }
+
+  // Проверка кода
+  const onSubmitCode = async (data: CodeSchema) => {
+    const phone = phoneForm.getValues("phone_number")
+
+    console.log("Проверка перед отправкой", {
+      phone_number: phone.startsWith("+7") ? phone : `+7${phone}`,
+      sms_code: data.sms_code,
+    })
+
+    if (!data?.sms_code)
+      setCodeError("sms_code", {
+        type: "manual",
+        message: "Введите смс-код.",
       })
 
-      startCooldown()
-      setIsCodeSent(true)
+    // Отправляем запрос с аутенфикацией
+    const result = await useAuthStore.getState().auth(phone, data.sms_code)
 
-      phoneForm.reset(data, {
+    console.log("Проверка ошибки", result.error)
+
+    // При ошибке вызываем обработчик и выходим
+    if (!result.success) {
+      const codeFormValues = codeForm.getValues()
+
+      // console.log("Ошибка 2", result.error)
+      errorFromAPISet(
+        result,
+        setCodeError,
+        codeFormValues,
+        startCooldownCode,
+        THROTTLES.AUTH,
+      )
+
+      // const secondsLeft = errorHandler(
+      //   result.error,
+      //   setCodeError,
+      //   codeForm.getValues(),
+      // )
+
+      // startCooldownCode(secondsLeft || THROTTLES.AUTH)
+
+      // Сбрасываем форму
+      codeForm.reset(codeFormValues, {
+        keepErrors: true,
         keepIsSubmitted: false,
         keepTouched: false,
         keepValues: true,
       })
-      triggerPhone()
-    } catch (e: unknown) {
-      if (axios.isAxiosError(e)) {
-        const data: ResponseData = e.response?.data
-        const secondsLeft = data?.detail?.seconds_left
 
-        if (secondsLeft) startCooldown(secondsLeft)
-      }
-
-      errorHandler(e, setPhoneError)
+      return
     }
+
+    // Все равно вызываем cooldown
+    startCooldownPhone(THROTTLES.AUTH)
+
+    // Сбрасываем форму
+    // codeForm.reset()
   }
 
-  // Проверка кода
-  // pass
+  // onClick для кнопки повторного смс
+  const onClickRepeatSMS = async () => {
+    const phone = phoneForm.getValues("phone_number")
+    const result = await useAuthStore.getState().sendSms(phone)
 
-  // Логика OTP-инпута (автопереход)
-  // const handleOtpChange = (index: number, value: string) => {
-  //   const char = value.slice(-1)
+    if (!result.success) {
+      console.log("Ошибка 3. Повторный смс-код", result.error)
+      errorFromAPISet(
+        result,
+        setPhoneError,
+        phoneForm.getValues(),
+        startCooldownPhone,
+        THROTTLES.REPEAT_SMS,
+      )
+    }
 
-  //   // Вызвать ошибку
-  //   if (!/^\d?$/.test(char)) return
-
-  // }
+    startCooldownPhone(THROTTLES.REPEAT_SMS)
+  }
 
   // 7. Вычисляемые значения
   const isPhoneBtnDisabled: boolean =
-    isPhoneSubmitting || isActive || !!phoneErrors.phone_number || !isPhoneValid
+    isPhoneSubmitting ||
+    isActivePhone ||
+    !!phoneErrors.phone_number ||
+    !isPhoneValid
 
   // 8. Рендер
 
@@ -140,6 +292,7 @@ export const AuthForm: React.FC = () => {
               {...field}
               onChange={(value) => {
                 setIsTyping(true)
+                setSwitchBackToSMS(false)
                 field.onChange(value)
               }}
               onBlur={() => {
@@ -167,8 +320,8 @@ export const AuthForm: React.FC = () => {
       >
         {isPhoneSubmitting
           ? "Отправляем..."
-          : isActive
-            ? `Отправлено. Повторить можно через: ${seconds}`
+          : isActivePhone
+            ? `Отправлено. Повторить можно через: ${secondsPhone}`
             : "Получить код"}
       </button>
     </form>
@@ -176,46 +329,81 @@ export const AuthForm: React.FC = () => {
 
   // Рендер этапа 2: Ввод смс-кода
   const renderCodeStep = (): JSX.Element => (
-    <div className="flex flex-col items-center animate-in fade-in duration-500">
-      <form className="flex flex-col items-center">
-        <div className="flex gap-2 mb-4">
-          {[...Array(6)].map((_, i) => (
-            <input
-              key={i}
-              name="code"
-              type="text"
-              inputMode="numeric"
-              maxLength={1}
-              onKeyDown={(e) => {
-                if (e.key === "Backspace" && !e.currentTarget.value && i > 0) {
-                }
-              }}
-            />
-          ))}
-        </div>
-
-        {codeErrors.code && (
-          <p className="text-red-500 text-xs mb-4">{codeErrors.code.message}</p>
-        )}
-
-        <button
-          type="submit"
-          disabled={isVerifying}
-          className="w-full bg-black text-white py-2 rounded-lg disabled:bg-gray-300"
+    <FormProvider {...codeForm}>
+      <div className="flex flex-col items-center animate-in fade-in duration-500">
+        <form
+          onSubmit={handleCodeSubmit(onSubmitCode)}
+          className="flex flex-col items-center space-y-4"
         >
-          {isVerifying ? "Проверка..." : "Войти"}
-        </button>
+          {phoneErrors.root && (
+            <div className="text-red-500 text-sm mb-6 text-center">
+              {phoneErrors.root.message}
+            </div>
+          )}
 
-        <button
-          type="button"
-          onClick={() => setIsCodeSent(false)}
-          className="mt-4 text-sm text-gray-500 underline"
-        >
-          Изменить номер
-        </button>
-      </form>
-    </div>
+          {codeErrors.root && (
+            <div className="text-red-500 text-sm mb-6 text-center">
+              {codeErrors.root.message}
+            </div>
+          )}
+
+          <OtpInput />
+          {/* {[...Array(6)].map((_, i) => (
+              <input
+                key={i}
+                ref={(el) => {
+                  otpRefs.current[i] = el
+                }}
+                name="sms_code"
+                type="text"
+                inputMode="numeric"
+                maxLength={1}
+                onChange={(e) => handleOtpChange(i, e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Backspace" && !e.currentTarget.value && i > 0) {
+                    otpRefs.current[i - 1]?.focus()
+                  }
+                }}
+                className={styles.codeInput}
+              />
+            ))} */}
+
+          {codeErrors.sms_code && (
+            <p className="text-red-500 text-xs">
+              {codeErrors.sms_code.message}
+            </p>
+          )}
+
+          <button
+            type="submit"
+            disabled={
+              isActiveCode ||
+              !codeForm.formState.isDirty ||
+              (codeForm.watch("sms_code") || "").length !== 6
+            }
+            className={styles.buttonAuth}
+          >
+            {isCodeValid && isCodeSubmitting
+              ? "Проверка..."
+              : isActiveCode
+                ? `Повторить можно через: ${secondsCode}`
+                : "Войти"}
+          </button>
+
+          <button
+            type="button"
+            disabled={isActivePhone}
+            className={styles.buttonRepeatSMS}
+            onClick={onClickRepeatSMS}
+          >
+            {isActivePhone
+              ? `Повторно отправить смс-код можно через ${secondsPhone}`
+              : "Отправить код снова"}
+          </button>
+        </form>
+      </div>
+    </FormProvider>
   )
 
-  return <>{!isCodeSent ? renderPhoneStep() : renderCodeStep()}</>
+  return <>{!isCodeStep ? renderPhoneStep() : renderCodeStep()}</>
 }

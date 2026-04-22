@@ -8,12 +8,12 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .models import SMSCode
-from .throttling import SMSRateThrottle
+from .throttling import SMSByPhoneThrottle, SMSIpThrottle
 
 
 class SendSMSView(APIView):
     permission_classes = [AllowAny]
-    throttle_classes = [SMSRateThrottle]
+    throttle_classes = [SMSByPhoneThrottle, SMSIpThrottle]
 
     def post(self, request):
         phone_raw = request.data.get("phone_number")

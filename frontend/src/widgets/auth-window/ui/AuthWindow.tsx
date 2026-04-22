@@ -1,30 +1,94 @@
 "use client"
 
 import { AuthForm } from "@/features/authByPhone/ui/AuthForm"
-import { Window } from "@/shared/ui/window/Window"
-import { useAuthStore } from "@/entities/authWindow/model/store"
-import { BackRedirectLine } from "@/shared/ui/backRedirectLine"
+import { Window } from "@/shared/ui/Window"
+import { SuspenseIcon } from "@/shared/ui/SuspenseIcon"
+import { useAuthWindowStore } from "@/entities/authWindow/"
+import { useShallow } from "zustand/shallow"
+import { useEffect, useState } from "react"
+import {
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  CloseIcon,
+} from "@/shared/ui/icons/icons"
+import { useAuthStore } from "@/entities/auth"
 
 export const AuthWindow = () => {
-  const stateAuth = useAuthStore((state) => state)
+  const { isOpen, toggle } = useAuthWindowStore(
+    useShallow((state) => ({
+      isOpen: state.isOpen,
+      toggle: state.toggle,
+    })),
+  )
+
+  const isAuth = useAuthStore((state) => state.isAuth)
+
+  const [isCodeStep, setIsCodeStep] = useState(false)
+  const [isPossibleSwitchBackToSMS, setSwitchBackToSMS] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") toggle()
+    }
+
+    window.addEventListener("keydown", handleKeyDown)
+
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown)
+    }
+  })
+
+  if (isAuth) return null
 
   return (
-    <>
-      <Window
-        title="Вход"
-        subtitle="Пожалуйста, войдите в систему, чтобы продолжить."
-        as="article"
-        className={`max-w-96 w-full h-auto bg-default`}
-        isOpen={stateAuth.isOpen}
-        toggleWindow={stateAuth.toggle}
-        backRedirect={
+    <Window
+      title="Вход"
+      subtitle="Пожалуйста, войдите в систему, чтобы продолжить."
+      as="article"
+      className={`max-w-96 w-full h-auto bg-default`}
+      isOpen={isOpen}
+      toggleWindow={toggle}
+      backRedirect={
+        !isCodeStep ? (
           <div className="w-full">
-            <BackRedirectLine logic={stateAuth.toggle} className="ml-auto" />
+            {isPossibleSwitchBackToSMS ? (
+              <SuspenseIcon
+                logic={() => {
+                  setIsCodeStep(true)
+                  setSwitchBackToSMS(false)
+                }}
+                className="ml-auto"
+                Icon={ArrowRightIcon}
+              />
+            ) : (
+              <SuspenseIcon
+                logic={toggle}
+                className="ml-auto"
+                Icon={CloseIcon}
+              />
+            )}
           </div>
-        }
-      >
-        <AuthForm />
-      </Window>
-    </>
+        ) : (
+          <div className="w-full">
+            <SuspenseIcon
+              logic={() => {
+                setIsCodeStep(false)
+                setSwitchBackToSMS(true)
+              }}
+              className="mr-auto"
+              Icon={ArrowLeftIcon}
+            />
+          </div>
+        )
+      }
+    >
+      <AuthForm
+        isCodeStep={isCodeStep}
+        setIsCodeStep={setIsCodeStep}
+        setSwitchBackToSMS={setSwitchBackToSMS}
+      />
+    </Window>
   )
 }

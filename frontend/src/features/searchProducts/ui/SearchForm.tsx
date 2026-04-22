@@ -1,6 +1,7 @@
 import Image from "next/image"
 import searchIcon from "@/shared/assets/icons/search-white.svg"
 import styles from "./SearchForm.module.scss"
+import { SearchIcon } from "@/shared/ui/icons/icons"
 
 export const SearchForm = () => {
   return (
@@ -15,7 +16,7 @@ export const SearchForm = () => {
         type="submit"
         className="bg-brand-main cursor-pointer px-1 h-full rounded-xl rounded-l-none"
       >
-        <Image src={searchIcon} alt="Поиск" width={24} height={24} />
+        <SearchIcon />
       </button>
     </form>
   )

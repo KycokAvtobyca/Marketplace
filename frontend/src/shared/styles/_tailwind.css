@@ -1,5 +1,13 @@
 @import "tailwindcss";
 
+@layer base {
+  html {
+    /* 1rem будет равен не 16px, а примерно 2.5% от ширины экрана */
+    /* clamp не даст шрифту стать слишком мелким или слишком огромным */
+    font-size: clamp(3px, 4vw, 16px);
+  }
+}
+
 @theme {
   --color-brand-main: #4b0082;
   --color-obsidian: #06030c;
@@ -9,4 +17,5 @@
   --min-width-default: 230px;
   --min-height-default: 230px;
   --background-color-default: #fffff0;
+  --color-default: #fffff0;
 }

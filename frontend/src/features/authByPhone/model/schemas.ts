@@ -29,7 +29,7 @@ export const phoneSchema = z.object({
 })
 
 export const codeSchema = z.object({
-  code: z.string().length(6, { message: "Код должен состоять из 6 цифр" }),
+  sms_code: z.string().length(6, { message: "Код должен состоять из 6 цифр" }),
 })
 
 export type PhoneSchema = z.infer<typeof phoneSchema>

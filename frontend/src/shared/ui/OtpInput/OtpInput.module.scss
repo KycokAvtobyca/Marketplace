@@ -1,0 +1,10 @@
+@reference "../../../shared/styles/_tailwind.css";
+
+.codeInput {
+  @apply text-center text-brand-main transition-all duration-300 w-8 h-11 outline-none border-brand-main/50 border-2 rounded-md;
+
+  &:focus,
+  &:hover {
+    @apply border-brand-main/80;
+  }
+}

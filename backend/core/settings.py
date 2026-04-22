@@ -28,7 +28,7 @@ SECRET_KEY = (
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
 
 # Application definition
@@ -167,9 +167,12 @@ REST_FRAMEWORK = {
         "rest_framework.throttling.UserRateThrottle",  # Включает защиту для всех залогиненных во всем проекте
     ],
     "DEFAULT_THROTTLE_RATES": {
-        "anon": "40/minute",
-        "user": "100/minute",
-        "sms": "1/min",
+        "anon": "40/min",
+        "user": "100/min",
+        "sms_phone": "1/min",
+        "sms_ip": "10/min",
+        "auth_token_phone": "12/min",
+        "auth_token_ip": "24/min",
     },
 }
 

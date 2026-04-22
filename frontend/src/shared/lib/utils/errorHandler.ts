@@ -1,60 +1,62 @@
-import axios from "axios"
+import { ErrorResponseAuthData } from "@/entities/auth"
 import { FieldValues, Path, UseFormSetError } from "react-hook-form"
-import { keyof } from "zod"
 
-export interface ResponseData {
-  detail?: {
-    message?: string
-    seconds_left?: number
-  }
-  phone_number?: string
-  sms_code?: string
-}
+const NON_FIELD_KEYS = ["detail", "non_field_errors"]
 
 export const errorHandler = <T extends FieldValues>(
-  e: unknown,
+  e: { data: ErrorResponseAuthData } | undefined,
   setError: UseFormSetError<T>,
-) => {
+  formValues?: T,
+): undefined | number => {
   const defaultMessage =
     "Произошла непредвиденная ошибка. Мы уже занимаемся этим."
 
-  if (axios.isAxiosError(e)) {
-    let lastMessage
+  try {
+    if (!e) throw new Error("Не передана ошибка из стора.")
 
-    const data: ResponseData = e.response?.data
+    const data = e?.data
+    const seconds_left = e?.data?.detail?.seconds_left
 
     if (!data || typeof data !== "object") {
-      // Отправка на API отчет об ошибке
-      setError("root" as Path<T>, { type: "manual", message: defaultMessage })
-      return defaultMessage
+      throw new Error("Данные ошибки не переданы или не являются объектом.")
     }
 
-    const keys = Object.keys(data) as (keyof ResponseData)[]
+    const keys = Object.keys(data) as (keyof ErrorResponseAuthData)[]
+
+    let isErrorSet = false
 
     keys.forEach((key) => {
-      const backendMessage = key === "detail" ? data[key]?.message : data[key]
+      const backendMessage: string | undefined = Array.isArray(data[key])
+        ? data[key][0]
+        : key === "detail"
+          ? data[key]?.message
+          : data[key]
 
-      const finalMessage =
-        typeof backendMessage === "string" ? backendMessage : defaultMessage
+      if (backendMessage) {
+        isErrorSet = true
 
-      console.log(key)
-
-      if (key === "detail") {
-        setError("root", { type: "manual", message: finalMessage })
-      } else {
-        setError(key as Path<T>, { type: "manual", message: finalMessage })
+        if (
+          NON_FIELD_KEYS.includes(key) ||
+          (formValues && !(key in formValues))
+        ) {
+          setError("root", { type: "manual", message: backendMessage })
+        } else {
+          setError(key as Path<T>, { type: "manual", message: backendMessage })
+        }
       }
-
-      lastMessage = backendMessage
     })
 
-    console.error(lastMessage, e?.response)
+    if (!isErrorSet) {
+      throw new Error("Ошибок нет. Лишний вызов errorHandler.")
+    }
 
-    return lastMessage
+    return Number(seconds_left)
 
     // Отправка на API отчет об ошибке
-  } else {
-    console.error(defaultMessage)
+  } catch (e) {
+    console.error(e)
+    setError("root" as Path<T>, { type: "manual", message: defaultMessage })
+
     // Отправка на API отчет об ошибке
   }
 }

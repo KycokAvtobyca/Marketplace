@@ -6,17 +6,14 @@ def custom_exception_handler(exc, context):
     response = exception_handler(exc, context)
 
     if isinstance(exc, Throttled) and response is not None:
-        view = context.get("view")
+        request = context.get("request")
+        throttle = getattr(request, "throttle_instance", None)
 
-        if view:
-            throttle = view.get_throttles()[0]
-
-            response.data["detail"] = {}
-
-            if hasattr(throttle, "message"):
-                response.data["detail"]["message"] = throttle.message
-
-            if hasattr(exc, "wait"):
-                response.data["detail"]["seconds_left"] = exc.wait
+        response.data = {
+            "detail": {
+                "message": getattr(throttle, "message", str(exc.detail)),
+                "seconds_left": int(exc.wait) if exc.wait else None,
+            }
+        }
 
     return response

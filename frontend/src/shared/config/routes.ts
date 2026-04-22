@@ -4,6 +4,7 @@ export const ROUTES = {
   //   ABOUT: '/about',
   //   // Динамический роут: передаем id и получаем строку пути
   //   PRODUCT_DETAILS: (id: string | number) => `/product/${id}`,
-  API_AUTH_SEND_SMS: "auth/send-sms/",
+  AUTH_SEND_SMS: "auth/send-sms/",
+  AUTH_TOKEN: "auth/token/",
   PROFILE: "/profile/",
 } as const
