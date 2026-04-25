@@ -1,0 +1,12 @@
+@reference "../../../shared/styles/_tailwind.css";
+
+.divP {
+  @apply text-sm;
+  & p {
+    @apply transition-colors;
+
+    &:hover {
+      @apply text-brand-main/80;
+    }
+  }
+}

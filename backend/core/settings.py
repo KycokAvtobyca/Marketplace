@@ -96,6 +96,7 @@ DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
         "NAME": "marketplace",
+        "USER": "postgres",
         "PASSWORD": "Aq27z_D3P",
         "HOST": "127.0.0.1",
         "PORT": "5432",

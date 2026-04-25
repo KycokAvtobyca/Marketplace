@@ -6,11 +6,8 @@ import { SuspenseIcon } from "@/shared/ui/SuspenseIcon"
 import { useAuthWindowStore } from "@/entities/authWindow/"
 import { useShallow } from "zustand/shallow"
 import { useEffect, useState } from "react"
-import {
-  ArrowLeftIcon,
-  ArrowRightIcon,
-  CloseIcon,
-} from "@/shared/ui/icons/icons"
+import { Icon } from "@/shared/ui/Icons"
+
 import { useAuthStore } from "@/entities/auth"
 
 export const AuthWindow = () => {
@@ -60,13 +57,13 @@ export const AuthWindow = () => {
                   setSwitchBackToSMS(false)
                 }}
                 className="ml-auto"
-                Icon={ArrowRightIcon}
+                Icon={Icon.ARROWRIGHT}
               />
             ) : (
               <SuspenseIcon
                 logic={toggle}
                 className="ml-auto"
-                Icon={CloseIcon}
+                Icon={Icon.CLOSE}
               />
             )}
           </div>
@@ -78,7 +75,7 @@ export const AuthWindow = () => {
                 setSwitchBackToSMS(true)
               }}
               className="mr-auto"
-              Icon={ArrowLeftIcon}
+              Icon={Icon.ARROWLEFT}
             />
           </div>
         )

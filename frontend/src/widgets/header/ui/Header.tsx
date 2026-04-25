@@ -1,8 +1,6 @@
-import Link from "next/link"
-import styles from "./Header.module.scss"
 import { SearchForm } from "@/features/searchProducts"
-import { Logo } from "@/shared/logo/ui/Logo"
-import { LoginButton } from "@/features/auth"
+import { Logo } from "@/shared/ui/Logo/ui/Logo"
+import { UserButton } from "@/features/auth"
 
 export const Header = () => {
   return (
@@ -16,7 +14,7 @@ export const Header = () => {
         <Logo />
       </div>
       <SearchForm />
-      <LoginButton />
+      <UserButton />
     </header>
   )
 }
