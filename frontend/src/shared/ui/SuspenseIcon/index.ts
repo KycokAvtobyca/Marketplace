@@ -1,1 +1,0 @@
-export { SuspenseIcon } from "./SuspenseIcon"

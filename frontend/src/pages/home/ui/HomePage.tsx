@@ -1,5 +1,5 @@
 import { ProductListTitle } from "@/shared/ui/ProductListTitle"
-import { ProductFiltersModal } from "@/features/ProductFiltersModal"
+import { FilterModalMenu } from "@/widgets/FilterModalMenu"
 
 export const HomePage = () => {
   return (
@@ -17,10 +17,10 @@ export const HomePage = () => {
       <header className="catalog__header">
         <div className="flex justify-between items-center">
           <ProductListTitle className="catalog__title" />
-          <ProductFiltersModal />
+          <FilterModalMenu classNameHamburgerButton="catalog__hamburger-button" />
         </div>
 
-        <div className="h-0.5 w-full rounded-full bg-brand-main mt-1 opacity-80" />
+        <div className="catalog-line h-0.5 w-full rounded-full bg-brand-main mt-1 opacity-80" />
       </header>
     </section>
   )

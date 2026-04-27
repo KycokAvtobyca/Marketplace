@@ -2,7 +2,6 @@
 
 import { AuthForm } from "@/features/AuthByPhone/ui/AuthForm"
 import { Window } from "@/shared/ui/Window"
-import { SuspenseIcon } from "@/shared/ui/SuspenseIcon"
 import { useAuthWindowStore } from "@/entities/authWindow/"
 import { useShallow } from "zustand/shallow"
 import { useEffect, useState } from "react"
@@ -62,32 +61,33 @@ export const AuthWindow = () => {
         !isCodeStep ? (
           <div className="w-full">
             {isPossibleSwitchBackToSMS ? (
-              <SuspenseIcon
-                logic={() => {
+              <button
+                onClick={() => {
                   setIsCodeStep(true)
                   setSwitchBackToSMS(false)
                 }}
+                type="button"
                 className="ml-auto"
-                Icon={Icon.ARROWRIGHT}
-              />
+              >
+                <Icon.ARROWRIGHT />
+              </button>
             ) : (
-              <SuspenseIcon
-                logic={toggle}
-                className="ml-auto"
-                Icon={Icon.CLOSE}
-              />
+              <button onClick={toggle} className="ml-auto">
+                <Icon.CLOSE />
+              </button>
             )}
           </div>
         ) : (
           <div className="w-full">
-            <SuspenseIcon
-              logic={() => {
+            <button
+              onClick={() => {
                 setIsCodeStep(false)
                 setSwitchBackToSMS(true)
               }}
               className="mr-auto"
-              Icon={Icon.ARROWLEFT}
-            />
+            >
+              <Icon.ARROWLEFT />
+            </button>
           </div>
         )
       }

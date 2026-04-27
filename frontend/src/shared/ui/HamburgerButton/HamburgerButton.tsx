@@ -1,11 +1,11 @@
 import { Icon } from "@/shared/ui/Icons"
 
-interface HamburgerMenuButtonProps {
+interface HamburgerButtonProps {
   className?: string
   onClick?: () => void
 }
 
-export const HamburgerMenuButton: React.FC<HamburgerMenuButtonProps> = ({
+export const HamburgerButton: React.FC<HamburgerButtonProps> = ({
   className,
   onClick,
 }) => {
