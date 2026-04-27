@@ -1,7 +1,8 @@
 import type { Metadata } from "next"
 import "@/app/styles/globals.scss"
-import { AuthWindow } from "@/widgets/auth-window/ui/AuthWindow"
-import { Header } from "@/widgets/header"
+
+export const revalidate = 7200
+
 export const metadata: Metadata = {
   title: "Маркетплейс Флоппи",
   description: "Курсовая работа Лыскова Ивана: Маркетплейс на Next.js + Django",
@@ -18,15 +19,13 @@ export default async function RootLayout({
         <div className="max-w-5xl p-3 w-full relative">
           <main className="grow">
             <div className="flex min-[450px]:hidden">{/* Header 2 */}</div>
-            <Header />
             {children}
           </main>
         </div>
 
+        {/* Элементы сюда добавляются через portal */}
         <div id="dropdowns" className="z-30"></div>
-        <div id="modals" className="z-40">
-          <AuthWindow />
-        </div>
+        <div id="modals" className="z-40"></div>
       </body>
     </html>
   )

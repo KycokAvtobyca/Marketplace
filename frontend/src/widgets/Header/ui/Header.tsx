@@ -1,6 +1,6 @@
-import { SearchForm } from "@/features/searchProducts"
+import { SearchForm } from "@/features/SearchProducts"
 import { Logo } from "@/shared/ui/Logo/ui/Logo"
-import { UserButton } from "@/features/auth"
+import { UserButton } from "@/features/Auth"
 
 export const Header = () => {
   return (

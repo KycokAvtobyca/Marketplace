@@ -1,10 +1,11 @@
-import React from "react"
+import React, { useEffect, useState } from "react"
 import styles from "./Window.module.scss"
 import { Overlay } from "./Overlay"
 import { clsx } from "clsx"
+import { useMountTransition } from "@/shared/lib/hooks"
 
 export interface WindowProps {
-  as?: "section" | "article"
+  wayAs?: "section" | "article"
   children?: React.ReactNode
   className?: string
   title?: React.ReactNode
@@ -13,10 +14,11 @@ export interface WindowProps {
   isOpen?: boolean
   toggleWindow?: () => void
   backRedirect?: React.ReactNode
+  transitionDuration?: number
 }
 
 export const Window: React.FC<WindowProps> = ({
-  as = "section",
+  wayAs = "section",
   children,
   className,
   title,
@@ -25,17 +27,25 @@ export const Window: React.FC<WindowProps> = ({
   isOpen,
   toggleWindow,
   backRedirect,
+  transitionDuration = 300,
 }) => {
-  const Element = as
+  const Element = wayAs
+  const { isVisible, shouldRender } = useMountTransition({
+    isOpen: !!isOpen,
+    transitionDuration,
+  })
+
+  if (!shouldRender) return
 
   return (
     <div
       className={clsx(
-        "transition-all duration-300",
-        isOpen
+        "transition-all",
+        isVisible
           ? "visible opacity-100"
-          : "invisible scale opacity-0 absolute pointer-events-none",
+          : "invisible opacity-0 absolute pointer-events-none",
       )}
+      style={{ transitionDuration: `${transitionDuration}ms` }}
     >
       <Element
         className={clsx(styles.window, className)}
@@ -45,7 +55,7 @@ export const Window: React.FC<WindowProps> = ({
         <div className="flex flex-col gap-2 justify-start w-full">
           {title && (
             <header>
-              <h1 className="text-xl">{title}</h1>
+              <h3 className="text-xl">{title}</h3>
               {subtitle && <p className="text-xs opacity-50">{subtitle}</p>}
             </header>
           )}

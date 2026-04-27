@@ -1,14 +1,9 @@
 "use client"
 
 import clsx from "clsx"
-import {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useRef,
-  useState,
-} from "react"
+import { useCallback, useLayoutEffect, useRef, useState } from "react"
 import { createPortal } from "react-dom"
+import { useMountTransition } from "@/shared/lib/hooks"
 
 interface PopoverProps {
   anchorRef: React.RefObject<HTMLElement | null>
@@ -37,10 +32,11 @@ export const Popover = ({
     arrowLeft: 0,
     isTop: false,
   })
-  // shouldRender управляет наличием в DOM
-  const [shouldRender, setShouldRender] = useState(isOpen)
-  // isVisible - классом анимации
-  const [isVisible, setIsVisible] = useState(false)
+
+  const { isVisible, shouldRender } = useMountTransition({
+    isOpen,
+    transitionDuration,
+  })
 
   // Создаем Ref для хранения ID текущего кадра
   const frameId = useRef<number>(0)
@@ -111,32 +107,6 @@ export const Popover = ({
     })
   }, [updatePosition])
 
-  // До отрисовки. Добавляется пустой
-  // div, благодаря setShouldRender
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    let frame: number
-
-    if (isOpen) {
-      // Компонент добавился в DOM,
-      // но он еще не нарисован с opacity 0
-      setShouldRender(true)
-
-      timer = setTimeout(
-        () => (frame = requestAnimationFrame(() => setIsVisible(true))),
-        0,
-      )
-    } else {
-      setIsVisible(false)
-      timer = setTimeout(() => setShouldRender(false), transitionDuration)
-    }
-
-    return () => {
-      if (timer) clearTimeout(timer)
-      if (frame) cancelAnimationFrame(frame)
-    }
-  }, [isOpen])
-
   // Сразу после того, как элемент вставился в DOM, но до
   // того как браузер успел нарисовать этот кадр на экране
   useLayoutEffect(() => {
@@ -146,9 +116,13 @@ export const Popover = ({
     // Создаем мозг обcервера
     const observer = new ResizeObserver(scheduleUpdate)
 
-    // Привязываем его к реальным элементам
+    // Привязываем его к элементам
     if (anchorRef.current) observer.observe(anchorRef.current)
     if (dropdownRef.current) observer.observe(dropdownRef.current)
+
+    // И к изменению размеров body,
+    // т.к. может появиться скроллбар
+    observer.observe(document.body)
 
     // Мгновенный расчет при монтировании
     scheduleUpdate()

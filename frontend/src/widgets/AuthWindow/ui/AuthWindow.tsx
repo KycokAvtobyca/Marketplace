@@ -1,6 +1,6 @@
 "use client"
 
-import { AuthForm } from "@/features/authByPhone/ui/AuthForm"
+import { AuthForm } from "@/features/AuthByPhone/ui/AuthForm"
 import { Window } from "@/shared/ui/Window"
 import { SuspenseIcon } from "@/shared/ui/SuspenseIcon"
 import { useAuthWindowStore } from "@/entities/authWindow/"
@@ -9,6 +9,7 @@ import { useEffect, useState } from "react"
 import { Icon } from "@/shared/ui/Icons"
 
 import { useAuthStore } from "@/entities/auth"
+import { createPortal } from "react-dom"
 
 export const AuthWindow = () => {
   const { isOpen, toggle } = useAuthWindowStore(
@@ -18,13 +19,19 @@ export const AuthWindow = () => {
     })),
   )
 
+  // Добавляем стейт, чтобы знать, что мы в браузере
+  const [mounted, setMounted] = useState(false)
+
   const isAuth = useAuthStore((state) => state.isAuth)
 
   const [isCodeStep, setIsCodeStep] = useState(false)
   const [isPossibleSwitchBackToSMS, setSwitchBackToSMS] = useState(false)
 
+  // useEffect срабатывает только на клиенте после первого рендера
   useEffect(() => {
     if (!isOpen) return
+
+    setMounted(true)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") toggle()
@@ -37,13 +44,17 @@ export const AuthWindow = () => {
     }
   })
 
-  if (isAuth) return null
+  // Если мы еще не на клиенте или пользователь авторизован - ничего не рендерим
+  if (!mounted || isAuth) return null
 
-  return (
+  const portalRoot = document.getElementById("modals")
+  if (!portalRoot) return null
+
+  return createPortal(
     <Window
       title="Вход"
       subtitle="Пожалуйста, войдите в систему, чтобы продолжить."
-      as="article"
+      wayAs="article"
       className={`max-w-96 w-full h-auto bg-default`}
       isOpen={isOpen}
       toggleWindow={toggle}
@@ -86,6 +97,7 @@ export const AuthWindow = () => {
         setIsCodeStep={setIsCodeStep}
         setSwitchBackToSMS={setSwitchBackToSMS}
       />
-    </Window>
+    </Window>,
+    portalRoot,
   )
 }

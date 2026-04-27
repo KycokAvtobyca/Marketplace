@@ -19,8 +19,6 @@ export const IconBase = ({
 }: IconProps) => {
   const SvgIcon = ICON_REGISTRY[name]
 
-  console.log(ICON_REGISTRY[name])
-
   return (
     <SvgIcon
       width={width}

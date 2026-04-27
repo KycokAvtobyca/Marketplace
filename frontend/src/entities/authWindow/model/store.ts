@@ -30,18 +30,14 @@ const authWindowStore: AuthWindowStoreCreator = (set) => ({
   toggle: () => {
     set(
       (s) => {
-        if (s.isOpen) {
-          s.isOpen = false
-        } else {
-          s.isOpen = true
-        }
+        s.isOpen = !s.isOpen
       },
       false,
-      "auth/authWindow_open",
+      "authWindow/toggle",
     )
   },
   setIsOpen: (isOpen) => {
-    genericSetAction(set, "isOpen", isOpen, "setIsOpen")
+    genericSetAction(set, "isOpen", isOpen, "authWindow/setIsOpen")
   },
 })
 

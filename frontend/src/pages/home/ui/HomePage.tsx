@@ -1,6 +1,9 @@
+import { ProductListTitle } from "@/shared/ui/ProductListTitle"
+import { ProductFiltersModal } from "@/features/ProductFiltersModal"
+
 export const HomePage = () => {
   return (
-    <section className="flex flex-col items-center justify-center py-20 px-4 text-center">
+    <section className="catalog py-15">
       {/* <h1
         id="hero-heading"
         className="text-4xl font-extrabold text-blue-600 mb-6 lg:text-5xl"
@@ -11,8 +14,14 @@ export const HomePage = () => {
         Здесь скоро появятся товары, которые мы будем получать по API из Django
         + DRF бэкенда.
       </p> */}
+      <header className="catalog__header">
+        <div className="flex justify-between items-center">
+          <ProductListTitle className="catalog__title" />
+          <ProductFiltersModal />
+        </div>
 
-      <h2>Главная страница</h2>
+        <div className="h-0.5 w-full rounded-full bg-brand-main mt-1 opacity-80" />
+      </header>
     </section>
   )
 }
