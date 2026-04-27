@@ -3,6 +3,7 @@
 import { useFilterModalMenuStore } from "@/entities/filterMenuModal"
 import { HamburgerButton } from "@/shared/ui/HamburgerButton"
 import { ModalMenu } from "@/shared/ui/ModalMenu"
+import { CheckBox } from "@/shared/ui/CheckBox"
 
 interface FilterModalMenuProps {
   classNameHamburgerButton?: string
@@ -28,6 +29,8 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
       >
         <div>
           <h3>Фильтры</h3>
+
+          <CheckBox />
         </div>
       </ModalMenu>
     </>

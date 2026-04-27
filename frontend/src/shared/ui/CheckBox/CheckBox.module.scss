@@ -1,0 +1,24 @@
+@reference "../../../shared/styles/_tailwind.css";
+
+.inputHidden {
+  @apply absolute w-px h-px overflow-hidden;
+  clip: rect(0 0 0 0);
+}
+
+.checkmark {
+  @apply inline-block w-5 h-5 relative rounded-sm border-2 border-brand-main/80 align-middle cursor-pointer transition-all duration-300;
+
+  .inputHidden:checked + & {
+    @apply bg-brand-main/80 border-brand-main/50;
+
+    &::after {
+      @apply block;
+    }
+  }
+
+  &::after {
+    content: "";
+    transform: translate(-50%, -60%) rotate(45deg);
+    @apply hidden absolute w-1.75 h-3 top-1/2 left-1/2 border-white border-t-0 border-r-2 border-b-2 border-l-0;
+  }
+}
