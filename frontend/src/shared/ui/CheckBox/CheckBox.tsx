@@ -7,7 +7,7 @@ interface CheckBoxProps {
 
 export const CheckBox: React.FC<CheckBoxProps> = ({ children }) => {
   return (
-    <label className="custom-checkbox">
+    <label className="custom-checkbox text-center space-x-1 flex items-center">
       <input
         type="checkbox"
         className={`custom-checkbox__input ${styles.inputHidden}`}

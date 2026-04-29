@@ -29,7 +29,7 @@ class SlugifiedNameMixin(models.Model):
         "Название",
         unique=True,
         max_length=50,
-        validators=[MinLengthValidator(3)],
+        validators=[MinLengthValidator(2)],
     )
     slug = models.SlugField(
         "Слаг (для URL)", unique=True, max_length=80, blank=True

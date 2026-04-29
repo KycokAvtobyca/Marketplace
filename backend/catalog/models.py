@@ -28,6 +28,14 @@ class ProductTag(Tag):
 
 # --- Базовые справочники ---
 class Category(SlugifiedNameMixin):
+    parent = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        related_name="children",
+        verbose_name="Родительская категория",
+    )
+
     class Meta:
         verbose_name = "Категория"
         verbose_name_plural = "Категории"
@@ -46,10 +54,7 @@ def brand_image_path(instance, filename):
     return os.path.join("brands", folder, filename)
 
 
-class Brand(models.Model):
-    name = models.CharField(
-        "Бренд", max_length=50, validators=[MinLengthValidator(2)], unique=True
-    )
+class Brand(SlugifiedNameMixin):
     description = models.TextField(
         "Описание бренда", max_length=5000, blank=True
     )
@@ -63,9 +68,25 @@ class Brand(models.Model):
         return self.name
 
 
+class Shop(SlugifiedNameMixin):
+    description = models.TextField(
+        "Описание магазина", max_length=5000, blank=True
+    )
+    image = models.ImageField("Изображение", upload_to=brand_image_path)
+
+    user
+
+    class Meta:
+        verbose_name = "Бренд"
+        verbose_name_plural = "Бренды"
+
+    def __str__(self):
+        return self.name
+
+
 # Категория свойства, то что вообще бывает.
 # Например: Цвет, Размер
-class Attribute(models.Model):
+class Attribute(SlugifiedNameMixin):
     name = models.CharField(
         "Название атрибута",
         unique=True,

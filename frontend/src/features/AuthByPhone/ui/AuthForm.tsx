@@ -16,7 +16,7 @@ import {
   PhoneSchema,
 } from "../model/schemas"
 import { useCooldown } from "@/shared/lib/hooks"
-import { errorHandler } from "@/shared/lib/utils/errorHandler"
+import { errorHandler } from "@/shared/lib/error-handler"
 import { JSX, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import styles from "./AuthForm.module.scss"

@@ -29,8 +29,9 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
       >
         <div>
           <h3>Фильтры</h3>
-
-          <CheckBox />
+          <CheckBox>
+            <span>Розы</span>
+          </CheckBox>
         </div>
       </ModalMenu>
     </>

@@ -1,5 +1,5 @@
-export { ICON_REGISTRY, ICON_SIZES } from "./iconsConfig"
-export type { IconName } from "./iconsConfig"
+export { ICON_REGISTRY, ICON_SIZES } from "./icons"
+export type { IconName } from "./icons"
 
 export { ROUTES } from "./routes"
 
