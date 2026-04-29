@@ -11,5 +11,7 @@ admin.site.register(
         models.Product,
         models.ProductVariant,
         models.ProductImage,
+        models.ProductType,
+        models.ProductTag,
     ]
 )

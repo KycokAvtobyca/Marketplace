@@ -1,49 +1,92 @@
-from rest_framework import generics, serializers
-from django.conf import settings
-from .models import Category, Product, ProductTag, Brand, Attribute, 
+from rest_framework import serializers
+from users.models import Shop
+
+from .models import (
+    Attribute,
+    AttributeValue,
+    Brand,
+    Category,
+    Product,
+    ProductTag,
+    ProductType,
+    ProductVariant,
+)
 
 
-class CategoryTreeSerializer(generics.ListAPIView):
+class CategorySerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
 
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "children"]
+        fields = ["name", "slug", "children"]
 
     def get_children(self, obj):
-        children = obj.children.all()
+        depth = self.context.get("depth")
 
-        if children.exists():
-            return CategoryTreeSerializer(children, many=True).data
-        return []
+        if depth is None or obj.level >= int(depth):
+            return []
+
+        children = obj.get_children()
+        return CategorySerializer(
+            children, many=True, context=self.context
+        ).data
 
 
 class BrandSerializer(serializers.ModelSerializer):
     class Meta:
         model = Brand
+        exclude = ["id"]
 
 
 class TagsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductTag
+        exclude = ["id", "is_active"]
 
 
-class SellerSerializer(serializers.ModelSerializer):
+class ShopSerializer(serializers.ModelSerializer):
     class Meta:
-        model = settings.AUTH_USER_MODEL
+        model = Shop
+        exclude = ["id", "is_active"]
 
 
 class AttributesSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attribute
+        exclude = ["id"]
+
+
+class AttributeValuesSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AttributeValue
+        exclude = ["attribute"]
+
+
+class ProductTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductType
+        exclude = ["id"]
+
+
+class ProductVariantSerializer(serializers.ModelSerializer):
+    attribute_values = AttributeValuesSerializer(read_only=True, many=True)
+
+    class Meta:
+        model = ProductVariant
+        fields = "__all__"
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    category = CategoryTreeSerializer(read_only=True)
+    category = serializers.SerializerMethodField()
     brand = BrandSerializer(read_only=True)
-    seller = SellerSerializer(read_only=True)
-    tags = TagsSerializer(read_only=True)
-    attributes = AttributesSerializer(read_only=True)
+    shop = ShopSerializer(read_only=True)
+    product_type = ProductTypeSerializer(read_only=True)
+    tags = TagsSerializer(read_only=True, many=True)
+    attributes = AttributesSerializer(read_only=True, many=True)
+    variants = ProductVariantSerializer(read_only=True, many=True)
+
+    def get_category(self, obj):
+        return CategorySerializer(obj.category.get_root()).data
 
     class Meta:
         model = Product

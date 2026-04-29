@@ -1,4 +1,3 @@
-import os
 import uuid
 
 from common.models import (
@@ -8,6 +7,7 @@ from common.models import (
     SlugifiedNameMixin,
     Tag,
 )
+from common.utils import UploadPath
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import (
@@ -15,21 +15,34 @@ from django.core.validators import (
     MinLengthValidator,
 )
 from django.db import IntegrityError, models, transaction
-from slugify import slugify
+from mptt.models import MPTTModel, TreeForeignKey
+from users.models import Shop
 
 from .managers import ProductVariantQuerySet
 
 
 # Сделать ограничение на макс 20 тегов в формах и api
 class ProductTag(Tag):
+    class Meta:
+        ordering = ["name", "pk"]
+        verbose_name = "Тег"
+        verbose_name_plural = "Теги"
+
     def __str__(self):
         return f"Тег продукта. {self.name}"
 
 
 # --- Базовые справочники ---
-class Category(SlugifiedNameMixin):
-    parent = models.ForeignKey(
+class Category(MPTTModel, SlugifiedNameMixin):
+    name = models.CharField(
+        "Название",
+        max_length=50,
+        validators=[MinLengthValidator(2)],
+    )
+    slug = models.SlugField("Слаг (для URL)", max_length=80, blank=True)
+    parent = TreeForeignKey(
         "self",
+        on_delete=models.SET_NULL,
         null=True,
         blank=True,
         related_name="children",
@@ -37,46 +50,25 @@ class Category(SlugifiedNameMixin):
     )
 
     class Meta:
+        ordering = ["tree_id", "lft"]
+        unique_together = [["parent", "slug"], ["parent", "name"]]
         verbose_name = "Категория"
         verbose_name_plural = "Категории"
 
-
-def brand_image_path(instance, filename):
-    """
-    Генерирует путь: media/brands/slug-name/filename
-    """
-
-    folder = slugify(instance.name)
-
-    if not folder:
-        folder = f"brand_{instance.pk or 'new'}"
-
-    return os.path.join("brands", folder, filename)
+    class MPTTMeta:
+        order_insertion_by = ["name"]
 
 
 class Brand(SlugifiedNameMixin):
     description = models.TextField(
         "Описание бренда", max_length=5000, blank=True
     )
-    image = models.ImageField("Изображение", upload_to=brand_image_path)
-
-    class Meta:
-        verbose_name = "Бренд"
-        verbose_name_plural = "Бренды"
-
-    def __str__(self):
-        return self.name
-
-
-class Shop(SlugifiedNameMixin):
-    description = models.TextField(
-        "Описание магазина", max_length=5000, blank=True
+    image = models.ImageField(
+        "Изображение", upload_to=UploadPath(prefix="brands")
     )
-    image = models.ImageField("Изображение", upload_to=brand_image_path)
-
-    user
 
     class Meta:
+        ordering = ["name", "pk"]
         verbose_name = "Бренд"
         verbose_name_plural = "Бренды"
 
@@ -95,6 +87,7 @@ class Attribute(SlugifiedNameMixin):
     )
 
     class Meta:
+        ordering = ["name", "pk"]
         verbose_name = "Атрибут"
         verbose_name_plural = "Атрибуты"
 
@@ -112,10 +105,11 @@ class AttributeValue(models.Model):
         Attribute, on_delete=models.CASCADE, verbose_name="Атрибут"
     )
     value = models.CharField(
-        "Значение атрибута", max_length=50, validators=[MinLengthValidator(2)]
+        "Значение атрибута", max_length=50, validators=[MinLengthValidator(1)]
     )
 
     class Meta:
+        ordering = ["attribute_id", "value"]
         verbose_name = "Значение атрибута"
         verbose_name_plural = "Значения атрибутов"
 
@@ -129,13 +123,33 @@ class AttributeValue(models.Model):
         return f"{self.attribute.name}: {self.value}"
 
 
+# Типа продукта (Толстовки, Футболки, как пример, но не категории)
+class ProductType(SlugifiedNameMixin):
+    class Meta:
+        ordering = ["name", "pk"]
+        verbose_name = "Тип продукта"
+        verbose_name_plural = "Типы продуктов"
+
+
 # Общая карточка
 class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
+    name = models.CharField(
+        "Название",
+        max_length=50,
+        validators=[MinLengthValidator(2)],
+    )
+    slug = models.SlugField("Слаг (для URL)", max_length=80, blank=True)
     description = models.TextField(
         "Описание товара",
         max_length=4000,
         blank=True,
         validators=[MinLengthValidator(10)],
+    )
+    product_type = models.ForeignKey(
+        ProductType,
+        on_delete=models.SET_NULL,
+        null=True,
+        verbose_name="Тип продукта",
     )
     views = models.PositiveIntegerField("Просмотры", default=0, editable=False)
     category = models.ForeignKey(
@@ -148,8 +162,8 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
         blank=True,
         verbose_name="Бренд",
     )
-    seller = models.ForeignKey(
-        settings.AUTH_USER_MODEL,
+    shop = models.ForeignKey(
+        Shop,
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Продавец",
@@ -173,6 +187,7 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
     )
 
     class Meta:
+        ordering = ["-pk", "name"]
         verbose_name = "Товар (карточка)"
         verbose_name_plural = "Товары (карточки)"
 
@@ -218,6 +233,7 @@ class ProductVariant(SingleMainMixin):
     )
 
     class Meta:
+        ordering = ["-product_id", "-pk"]
         verbose_name = "Вариант товара (SKU)"
         verbose_name_plural = "Варианты товаров (SKU)"
 

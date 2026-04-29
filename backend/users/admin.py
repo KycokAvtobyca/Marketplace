@@ -2,7 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .forms import CustomUserChangeForm, CustomUserCreationForm
-from .models import CustomUser, SMSCode
+from .models import CustomUser, Shop, SMSCode
 
 
 @admin.register(CustomUser)
@@ -83,4 +83,4 @@ class CustomUserAdmin(UserAdmin):
     readonly_fields = ("date_time_create", "date_time_update", "last_login")
 
 
-admin.site.register(SMSCode)
+admin.site.register([SMSCode, Shop])

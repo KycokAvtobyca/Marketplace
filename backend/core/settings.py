@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "orders",
     "favorites",
     "reviews",
+    "api",
 ]
 
 AUTH_USER_MODEL = "users.CustomUser"

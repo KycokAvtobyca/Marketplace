@@ -1,4 +1,9 @@
-from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
+from common.models import (
+    DateTimeCreateMixin,
+    DateTimeUpdateMixin,
+    SlugifiedNameMixin,
+)
+from common.utils import UploadPath
 from django.conf import settings
 from django.contrib.auth.models import (
     AbstractBaseUser,
@@ -174,3 +179,29 @@ class SMSCode(DateTimeCreateMixin):
 
     def __str__(self):
         return f"СМС-код для {self.phone_number}"
+
+
+class Shop(SlugifiedNameMixin):
+    owner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="shop",
+        verbose_name="Продавец магазина",
+    )
+    description = models.TextField("Описание", blank=True, max_length=500)
+    is_active = models.BooleanField("Активен", default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    image = models.ImageField(
+        "Изображение",
+        upload_to=UploadPath("shops"),
+        blank=True,
+        null=True,
+    )
+
+    class Meta:
+        verbose_name = "Магазин"
+        verbose_name_plural = "Магазины"
+
+    def __str__(self):
+        return f"Магазин {self.name}"
