@@ -43,6 +43,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
+    "drf_spectacular",
     "phonenumber_field",
     "django_extensions",
     "common",
@@ -153,6 +154,7 @@ MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
 REST_FRAMEWORK = {
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
     "DEFAULT_RENDERER_CLASSES": [
         "rest_framework.renderers.JSONRenderer",
@@ -219,4 +221,41 @@ SIMPLE_JWT = {
     # "CHECK_REVOKE_TOKEN": False,
     # "REVOKE_TOKEN_CLAIM": "hash_password",
     "CHECK_USER_IS_ACTIVE": True,
+}
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "Floppi Marketplace API",
+    "DESCRIPTION": "Подробное описание Floppi Marketplace API",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+    # --- СОРТИРОВКА И ГРУППИРОВКА ---
+    # Сортировка операций в Swagger UI (alpha - по алфавиту)
+    "SWAGGER_UI_SETTINGS": {
+        "deepLinking": True,
+        "operationsSorter": "alpha",  # Сортировка методов (GET, POST...) внутри тега
+        "tagsSorter": "alpha",  # Сортировка самих тегов (групп эндпоинтов)
+        "filter": True,  # Добавляет поле поиска по эндпоинтам
+    },
+    # --- ЛОГИКА ГЕНЕРАЦИИ ---
+    # Разделяет схемы для PATCH и POST.
+    # В PATCH все поля станут необязательными автоматически — это правильно для OpenAPI.
+    "COMPONENT_SPLIT_PATCH": True,
+    # Генерирует описание для полей ChoiceField (Enum) на основе docstring или меток.
+    "ENUM_GENERATE_CHOICE_DESCRIPTION": True,
+    # Если эндпоинты начинаются с /api/v1/, эта настройка уберет префикс из имен тегов.
+    "SCHEMA_PATH_PREFIX": r"/api/v[0-9]/",
+    # --- ДОПОЛНИТЕЛЬНАЯ ИНФОРМАЦИЯ ---
+    # 'CONTACT': {
+    #     'name': 'API Support',
+    #     'url': 'https://www.example.com/support',
+    #     'email': 'support@example.com',
+    # },
+    # 'LICENSE': {
+    #     'name': 'MIT License',
+    # },
+    # --- АВТОРИЗАЦИЯ ---
+    # Чтобы в Swagger появилась кнопка Authorize
+    "SERVE_AUTHENTICATION": [
+        "api.authentication.HttpOnlyJWTAuthentication",
+    ],
 }

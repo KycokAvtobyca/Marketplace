@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from users.models import Shop
+from users.serializers import ShopSerializer
 
 from .models import (
     Attribute,
@@ -38,15 +38,9 @@ class BrandSerializer(serializers.ModelSerializer):
         exclude = ["id"]
 
 
-class TagsSerializer(serializers.ModelSerializer):
+class ProductTagsSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductTag
-        exclude = ["id", "is_active"]
-
-
-class ShopSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Shop
         exclude = ["id", "is_active"]
 
 
@@ -78,15 +72,25 @@ class ProductVariantSerializer(serializers.ModelSerializer):
 
 class ProductSerializer(serializers.ModelSerializer):
     category = serializers.SerializerMethodField()
+    variants = serializers.SerializerMethodField()
+
     brand = BrandSerializer(read_only=True)
     shop = ShopSerializer(read_only=True)
     product_type = ProductTypeSerializer(read_only=True)
-    tags = TagsSerializer(read_only=True, many=True)
+    tags = ProductTagsSerializer(read_only=True, many=True)
     attributes = AttributesSerializer(read_only=True, many=True)
-    variants = ProductVariantSerializer(read_only=True, many=True)
 
     def get_category(self, obj):
         return CategorySerializer(obj.category.get_root()).data
+
+    def get_variants(self, obj):
+        variants = self.context.get("variants_flag")
+
+        if variants is not None:
+            return ProductVariantSerializer(
+                obj.variants.all(), read_only=True, many=True
+            ).data
+        return []
 
     class Meta:
         model = Product

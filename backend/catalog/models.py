@@ -161,6 +161,7 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
         null=True,
         blank=True,
         verbose_name="Бренд",
+        related_name="products",
     )
     shop = models.ForeignKey(
         Shop,

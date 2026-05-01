@@ -3,7 +3,7 @@ from phonenumber_field.modelfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CustomUser, SMSCode
+from .models import CustomUser, Shop, SMSCode
 
 
 class HybridTokenSerializer(TokenObtainPairSerializer):
@@ -58,3 +58,9 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
             "access": str(refresh.access_token),
             "is_new_user": created,
         }
+
+
+class ShopSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        exclude = ["id", "is_active"]

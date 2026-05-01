@@ -1,10 +1,14 @@
-from django.urls import path
+from django.urls import include, path
+from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
 
-from .views import HybridTokenObtainView, ProfileView, SendSMSView
+from .views import HybridTokenObtainView, ProfileView, SendSMSView, ShopViewSet
+
+router = DefaultRouter()
+router.register("shop", ShopViewSet)
 
 urlpatterns = [
     path("auth/send-sms/", SendSMSView.as_view(), name="send_sms"),
@@ -16,4 +20,5 @@ urlpatterns = [
     ),
     path("auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("", include(router.urls)),
 ]

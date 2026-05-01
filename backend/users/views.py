@@ -3,15 +3,15 @@ import random
 from django.conf import settings
 from django.utils import timezone
 from phonenumber_field.phonenumber import to_python
-from rest_framework import status
+from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenObtainPairView
 
-from users.serializers import HybridTokenSerializer
+from users.serializers import HybridTokenSerializer, ShopSerializer
 
-from .models import SMSCode
+from .models import Shop, SMSCode
 from .throttling import (
     AuthTokenByPhone,
     AuthTokenIPThrottle,
@@ -129,3 +129,9 @@ class ProfileView(APIView):
                 # Позже добавить и другие поля
             }
         )
+
+
+class ShopViewSet(viewsets.ReadOnlyModelViewSet):
+    lookup_field = "slug"
+    queryset = Shop.objects.all()
+    serializer_class = ShopSerializer
