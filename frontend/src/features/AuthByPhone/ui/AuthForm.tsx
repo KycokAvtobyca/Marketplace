@@ -21,6 +21,7 @@ import { JSX, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import styles from "./AuthForm.module.scss"
 import { ApiAction, useAuthStore } from "@/entities/auth"
+import { useAuth, useSendSms } from "@/entities/auth"
 import { THROTTLES } from "@/shared/config/throttles"
 import { OtpInput } from "@/shared/ui/OtpInput"
 
@@ -35,8 +36,10 @@ export const AuthForm: React.FC<Props> = ({
   setIsCodeStep,
   setSwitchBackToSMS,
 }) => {
-  // 1. Состояния UI
+  // 1. Состояния UI и React Query
   const [isTyping, setIsTyping] = useState(false)
+  const { mutateAsync: mutateAsyncSms, isPending: isPendingSms } = useSendSms()
+  const { mutateAsync: mutateAsyncPhone, isPending: isPendingAuth } = useAuth()
 
   // const { isAuth, isCodeSent, isLoading } = useAuthStore(
   //   useShallow((state) => ({
@@ -142,10 +145,12 @@ export const AuthForm: React.FC<Props> = ({
   // Отправка смс
   const onSubmitPhoneNumber = async (data: PhoneSchema) => {
     // Отправляем запрос на api
-    const result = await useAuthStore.getState().sendSms(data.phone_number)
+    const result = await mutateAsyncSms(data.phone_number)
 
     // При ошибке вызываем обработчик и выходим
     if (!result.success) {
+      console.log("Проверка ошибки phone", result.error)
+
       errorFromAPISet(
         result,
         setPhoneError,
@@ -153,17 +158,6 @@ export const AuthForm: React.FC<Props> = ({
         startCooldownPhone,
         THROTTLES.PHONE,
       )
-      // console.log("Ошибка 1", result.error)
-
-      // const secondsLeft = errorHandler(
-      //   result.error,
-      //   setPhoneError,
-      //   phoneForm.getValues(),
-      // )
-
-      // startCooldownPhone(secondsLeft || THROTTLES.PHONE)
-
-      // return
     }
 
     // Запускаем cooldown, если не было ошибки
@@ -198,15 +192,17 @@ export const AuthForm: React.FC<Props> = ({
       })
 
     // Отправляем запрос с аутенфикацией
-    const result = await useAuthStore.getState().auth(phone, data.sms_code)
-
-    console.log("Проверка ошибки", result.error)
+    const result = await mutateAsyncPhone({
+      phone_number: phone,
+      sms_code: data.sms_code,
+    })
 
     // При ошибке вызываем обработчик и выходим
     if (!result.success) {
+      console.log("Проверка ошибки sms", result.error)
+
       const codeFormValues = codeForm.getValues()
 
-      // console.log("Ошибка 2", result.error)
       errorFromAPISet(
         result,
         setCodeError,
@@ -214,14 +210,6 @@ export const AuthForm: React.FC<Props> = ({
         startCooldownCode,
         THROTTLES.AUTH,
       )
-
-      // const secondsLeft = errorHandler(
-      //   result.error,
-      //   setCodeError,
-      //   codeForm.getValues(),
-      // )
-
-      // startCooldownCode(secondsLeft || THROTTLES.AUTH)
 
       // Сбрасываем форму
       codeForm.reset(codeFormValues, {
@@ -244,7 +232,7 @@ export const AuthForm: React.FC<Props> = ({
   // onClick для кнопки повторного смс
   const onClickRepeatSMS = async () => {
     const phone = phoneForm.getValues("phone_number")
-    const result = await useAuthStore.getState().sendSms(phone)
+    const result = await mutateAsyncSms(phone)
 
     if (!result.success) {
       console.log("Ошибка 3. Повторный смс-код", result.error)

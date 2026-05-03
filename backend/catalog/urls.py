@@ -12,7 +12,8 @@ router.register("product-tags", v.ProductTagViewSet)
 router.register("attributes", v.AttributesViewSet)
 router.register("attribute-values", v.AttributeValuesViewSet)
 router.register("product-types", v.ProductTypeViewSet)
-router.register("product-variants", v.ProductVariantViewSet)
+router.register("sku", v.ProductVariantViewSet, basename="sku")
+
 
 # Вложенные роутеры
 brands_router = routers.NestedSimpleRouter(router, "brands", lookup="brand")
@@ -21,4 +22,5 @@ brands_router.register("products", v.ProductViewSet, basename="brand-product")
 urlpatterns = [
     path("", include(router.urls)),
     path("", include(brands_router.urls)),
+    path("filter-price/", v.PriceRangeAPIView.as_view(), name="filter-price"),
 ]

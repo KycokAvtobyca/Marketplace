@@ -1,12 +1,13 @@
 import uuid
 
-from common.models import (
+from common.mixins import (
     DateTimeCreateMixin,
     DateTimeUpdateMixin,
     SingleMainMixin,
     SlugifiedNameMixin,
-    Tag,
+    SlugMixin,
 )
+from common.models import Tag
 from common.utils import UploadPath
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -33,7 +34,7 @@ class ProductTag(Tag):
 
 
 # --- Базовые справочники ---
-class Category(MPTTModel, SlugifiedNameMixin):
+class Category(MPTTModel, SlugMixin):
     name = models.CharField(
         "Название",
         max_length=50,
@@ -58,6 +59,20 @@ class Category(MPTTModel, SlugifiedNameMixin):
     class MPTTMeta:
         order_insertion_by = ["name"]
 
+    def clean(self):
+        super().clean()
+
+        if self.parent:
+            if self.parent.level >= 2:
+                raise ValidationError(
+                    "Максимальная вложенность категорий - 3 уровня. "
+                    "Эта категория уже находится на третьем уровне."
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
 
 class Brand(SlugifiedNameMixin):
     description = models.TextField(
@@ -78,13 +93,14 @@ class Brand(SlugifiedNameMixin):
 
 # Категория свойства, то что вообще бывает.
 # Например: Цвет, Размер
-class Attribute(SlugifiedNameMixin):
+class Attribute(SlugMixin):
     name = models.CharField(
         "Название атрибута",
         unique=True,
         max_length=99,
         validators=[MinLengthValidator(2)],
     )
+    is_active = models.BooleanField("Активен", default=False)
 
     class Meta:
         ordering = ["name", "pk"]
@@ -132,7 +148,7 @@ class ProductType(SlugifiedNameMixin):
 
 
 # Общая карточка
-class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugifiedNameMixin):
+class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugMixin):
     name = models.CharField(
         "Название",
         max_length=50,
@@ -251,7 +267,7 @@ class ProductVariant(SingleMainMixin):
         ]
 
     def __str__(self):
-        return f"{self.product.name} ({self.sku})"
+        return f"ID: {self.pk} {self.product.name} (SKU: {self.sku})"
 
     @property
     def final_price(self):

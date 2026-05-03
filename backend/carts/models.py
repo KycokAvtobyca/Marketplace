@@ -1,8 +1,8 @@
-from common.models import (
+from common.mixins import (
     DateTimeCreateMixin,
     DateTimeUpdateMixin,
-    SiteConfiguration,
 )
+from common.models import SiteConfiguration
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import (

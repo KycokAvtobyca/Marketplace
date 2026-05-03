@@ -1,4 +1,7 @@
-from common.models import DateTimeCreateMixin, DateTimeUpdateMixin
+from common.mixins import (
+    DateTimeCreateMixin,
+    DateTimeUpdateMixin,
+)
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import (
@@ -111,6 +114,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,
         blank=True,
         verbose_name="На тег (подборку)",
+        help_text="Приоритет 4",
     )
     product = models.ForeignKey(
         "catalog.Product",
@@ -118,7 +122,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,
         blank=True,
         verbose_name="На товар",
-        help_text="Приоритет 4",
+        help_text="Приоритет 5",
     )
     product_variant = models.ForeignKey(
         "catalog.ProductVariant",
@@ -126,7 +130,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,
         blank=True,
         verbose_name="На вариацию товара (SKU)",
-        help_text="Приоритет 5",
+        help_text="Приоритет 6",
     )
     segment = models.ForeignKey(
         "users.UserSegment",
@@ -134,7 +138,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,
         blank=True,
         verbose_name="На сегмент пользователей",
-        help_text="Приоритет 6",
+        help_text="Приоритет 7",
     )
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -142,7 +146,7 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         null=True,
         blank=True,
         verbose_name="На пользователя",
-        help_text="Приоритет 7",
+        help_text="Приоритет 8",
     )
 
     # Исключения
@@ -262,6 +266,8 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
             self.priority = priority_choices.GLOBAL
         else:
             self.priority = self.calculate_priority()
+
+        super().save(*args, **kwargs)
 
 
 class Discount(MarketingBase):

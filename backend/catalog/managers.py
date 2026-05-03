@@ -22,14 +22,24 @@ class ProductVariantQuerySet(models.QuerySet):
         """
         from marketing.models import Discount
 
+        from catalog.models import Product
+
         # Подзапрос: ищем самую приоритетную активную скидку
         # Базовые фильтры (доступны всем)
+
+        # m2m. Первый OuterRef выводи к запросу скидок, а второй к ProductVariant
+        product_tags_ids = Product.objects.filter(
+            pk=OuterRef(OuterRef("product_id"))
+        ).values("tags")
+
         discount_filter = models.Q(
             models.Q(product_variant_id=OuterRef("pk"))
             | models.Q(product_id=OuterRef("product_id"))
-            | models.Q(tag_id=OuterRef("tag_id"))
-            | models.Q(brand_id=OuterRef("brand_id"))
-            | models.Q(category_id=OuterRef("category_id"))
+            | models.Q(
+                tag_id__in=Subquery(product_tags_ids)
+            )  # входит ли тег скидки в теги Product
+            | models.Q(brand_id=OuterRef("product__brand_id"))
+            | models.Q(category_id=OuterRef("product__category_id"))
             | models.Q(is_global=True)
         )
 

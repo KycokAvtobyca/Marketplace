@@ -1,4 +1,4 @@
-from common.models import (
+from common.mixins import (
     DateTimeCreateMixin,
     DateTimeUpdateMixin,
     SlugifiedNameMixin,

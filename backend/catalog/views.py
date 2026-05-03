@@ -1,29 +1,66 @@
-from django.db.models import Prefetch
-from rest_framework import viewsets
-from users.models import Shop
-from users.serializers import ShopSerializer
+from django.db.models import Max, Min
+from rest_framework import views, viewsets
+from rest_framework.pagination import CursorPagination
+from rest_framework.response import Response
+from rest_framework.settings import api_settings
 
 from catalog import models as m
+from catalog.mixins import CategoryTreeOptimizerMixin
 
 from . import serializers as s
 
 
-class ProductViewSet(viewsets.ReadOnlyModelViewSet):
-    # lookup_field = "slug"
+class FilterValuesPagination(CursorPagination):
+    page_size = 10
+    cursor_query_param = "cursor"
+    ordering = "-id"
+    template = None
+
+
+class DefaultCursorPagination(CursorPagination):
+    page_size = api_settings.PAGE_SIZE
+    cursor_query_param = "cursor"
+    ordering = "-id"
+    template = None
+
+
+class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
     serializer_class = s.ProductSerializer
+    pagination_class = DefaultCursorPagination
 
     def get_queryset(self):
+        from django.db.models import Prefetch
+
+        variants_flag = self.request.query_params.get("variants_flag")
+
+        prefetches = [
+            Prefetch(
+                "tags", queryset=m.ProductTag.objects.filter(is_active=True)
+            ),
+            Prefetch(
+                "attributes",
+                queryset=m.Attribute.objects.filter(is_active=True),
+            ),
+        ]
+
+        if variants_flag:
+            prefetches.append(
+                Prefetch(
+                    "variants",
+                    queryset=m.ProductVariant.objects.filter(
+                        is_active=True
+                    ).prefetch_related("attribute_values"),
+                )
+            )
+
         qs = (
             m.Product.objects.select_related(
-                "category", "brand", "shop", "product_type"
+                "brand",
+                "shop",
+                "product_type",
+                "category",  # доступ к category_id без запроса
             )
-            .prefetch_related(
-                Prefetch(
-                    "tags", queryset=m.ProductTag.objects.filter(is_active=True)
-                ),
-                "attributes",
-                "variants__attribute_values",
-            )
+            .prefetch_related(*prefetches)
             .filter(shop__is_active=True)
         )
 
@@ -35,20 +72,30 @@ class ProductViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
-        context["variants_flag"] = self.request.query_params.get(
-            "variants_flag"
+        context.update(
+            {
+                "variants_flag": self.request.query_params.get("variants_flag"),
+                "depth": self.request.query_params.get("depth"),
+            }
         )
         return context
 
 
-class CategoryViewSet(viewsets.ReadOnlyModelViewSet):
+class CategoryViewSet(
+    CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet
+):
     lookup_field = "slug"
     serializer_class = s.CategorySerializer
+    pagination_class = FilterValuesPagination
+    category_relation_path = ""
 
     def get_queryset(self):
-        qs = m.Category.objects.all().prefetch_related("children")
-        print(self.action)
-        if self.action == "list":
+        # убрали .prefetch_related("children"), так как миксин сделает это эффективнее
+        qs = m.Category.objects.all()
+        if (
+            self.action == "list"
+            or self.request.query_params.get("depth") == "0"
+        ):
             return qs.filter(level=0)
         return qs
 
@@ -62,38 +109,82 @@ class BrandViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
     queryset = m.Brand.objects.all()
     serializer_class = s.BrandSerializer
+    pagination_class = FilterValuesPagination
 
 
 class ProductTagViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
     queryset = m.ProductTag.objects.all()
     serializer_class = s.ProductTagsSerializer
-
-
-class ShopViewSet(viewsets.ReadOnlyModelViewSet):
-    lookup_field = "slug"
-    queryset = Shop.objects.all()
-    serializer_class = ShopSerializer
+    pagination_class = DefaultCursorPagination
 
 
 class AttributesViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
     queryset = m.Attribute.objects.all()
     serializer_class = s.AttributesSerializer
+    pagination_class = FilterValuesPagination
 
 
 class AttributeValuesViewSet(viewsets.ReadOnlyModelViewSet):
-    lookup_field = "slug"
     queryset = m.AttributeValue.objects.all()
     serializer_class = s.AttributeValuesSerializer
+    pagination_class = DefaultCursorPagination
 
 
 class ProductTypeViewSet(viewsets.ReadOnlyModelViewSet):
     lookup_field = "slug"
     queryset = m.ProductType.objects.all()
     serializer_class = s.ProductTypeSerializer
+    pagination_class = FilterValuesPagination
 
 
 class ProductVariantViewSet(viewsets.ReadOnlyModelViewSet):
-    queryset = m.ProductVariant.objects.all()
     serializer_class = s.ProductVariantSerializer
+    pagination_class = DefaultCursorPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        return (
+            m.ProductVariant.objects.with_prices(user=user)
+            .prefetch_related("attribute_values")
+            .filter(is_active=True)
+        )
+
+
+class PriceRangeAPIView(views.APIView):
+    def get(self, request):
+        user = request.user
+
+        prices = m.ProductVariant.objects.with_prices(user=user).aggregate(
+            min_price=Min("discounted_price"), max_price=Max("discounted_price")
+        )
+
+        return Response(
+            {"min": prices["min_price"] or 0, "max": prices["max_price"] or 0}
+        )
+
+
+# class FiltersApiView(views.APIView):
+#     """
+#     Эндпоинт для получения всех данных для модалки фильтров
+#     """
+#     # category:
+#     #     Категории:
+#     #     ...
+#         #     producttype:
+#             #     Типы продукта:
+#             #     ...
+#                 #     brand: брэнды
+#                 #     shop: магазин
+#                 #     attributes: атрибуты
+#                 #     Цена
+
+#     def get(self, request):
+#         paginator = FilterValuesPagination()
+
+#         # Бренды с пагинацией
+#         brands_qs = m.Brand.objects.all()
+#         brands_page = paginator.paginate_queryset(brands_qs, request)
+#         brands_data = s.BrandSerializer(brands_page,)

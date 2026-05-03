@@ -40,13 +40,13 @@ export const UserButtonBase = () => {
             onClose={() => setIsMenuOpen(false)}
           >
             <div className={styles.divP}>
-              <Link href={ROUTES.PROFILE}>
+              <Link href={ROUTES.PROFILE.ROOT}>
                 <p>Личный кабинет</p>
               </Link>
-              <Link href={ROUTES.ORDERS}>
+              {/* <Link href={ROUTES.ORDERS}>
                 <p>Заказы</p>
-              </Link>
-              <Link href={ROUTES.EXIT}>
+              </Link> */}
+              <Link href={ROUTES.PROFILE.EXIT}>
                 <p>Выйти</p>
               </Link>
             </div>
