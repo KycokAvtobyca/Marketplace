@@ -1,6 +1,9 @@
-from django.db.models import Max, Min
+from django.db.models import Max, Min, Prefetch
 from rest_framework import views, viewsets
+from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.pagination import CursorPagination
+from rest_framework.request import Request
 from rest_framework.response import Response
 from rest_framework.settings import api_settings
 
@@ -29,7 +32,6 @@ class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
     pagination_class = DefaultCursorPagination
 
     def get_queryset(self):
-        from django.db.models import Prefetch
 
         variants_flag = self.request.query_params.get("variants_flag")
 
@@ -154,7 +156,7 @@ class ProductVariantViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class PriceRangeAPIView(views.APIView):
-    def get(self, request):
+    def get(self, request: Request):
         user = request.user
 
         prices = m.ProductVariant.objects.with_prices(user=user).aggregate(
@@ -163,6 +165,70 @@ class PriceRangeAPIView(views.APIView):
 
         return Response(
             {"min": prices["min_price"] or 0, "max": prices["max_price"] or 0}
+        )
+
+
+class FilterViewSet(viewsets.ViewSet):
+    @action(detail=False, methods=["get"])
+    def categories(self, request: Request, *args, **kwargs):
+        params = request._request.GET.copy()
+
+        # По умолчанию ставим уровень вложенности 3
+        params["depth"] = 3
+
+        request._request.GET = params
+
+        category_list_view = CategoryViewSet.as_view({"get": "list"})
+
+        return category_list_view(request._request, *args, **kwargs)
+
+    @action(detail=False, methods=["get"])
+    def types(self, request: Request, *args, **kwargs):
+        # Собираем значения query param categories
+        categories = request.query_params.getlist("categories")
+
+        if len(categories) < 1:
+            raise ValidationError(
+                {
+                    "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
+                }
+            )
+
+        qs = m.ProductType.objects.filter(
+            products__category__slug__in=categories
+        ).distinct()
+
+        product_type_list_view = ProductTypeViewSet.as_view(
+            {"get": "list"}, queryset=qs
+        )
+
+        return product_type_list_view(request._request, *args, **kwargs)
+
+    @action(detail=False, methods=["get"])
+    def meta(self, request: Request, *args, **kwargs):
+        categories = request.query_params.getlist("categories")
+        types = request.query_params.getlist("types")
+
+        if len(categories) < 1:
+            raise ValidationError(
+                {
+                    "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
+                }
+            )
+
+        if len(types) < 1:
+            raise ValidationError(
+                {
+                    "types": "Нужно передать 1 или более типов продукта для продолжения фильтрации"
+                }
+            )
+
+        qs_values = m.Product.objects.filter(
+            category__slug__in=categories, product_type__slug__in=types
+        ).distinct()
+
+        product_list_view = ProductViewSet.as_view(
+            {"get": "list"}, queryset=qs_values
         )
 
 

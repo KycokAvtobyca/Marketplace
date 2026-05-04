@@ -10,7 +10,6 @@ interface IActions {
 
 interface IInitialState {
   isFilterModalMenu: boolean
-  isLoading: boolean
 }
 
 interface FilterModalMenuStore extends IActions, IInitialState {}
@@ -22,7 +21,6 @@ type FilterModalMenuStoreCreator = StateCreator<
 
 const initialState: IInitialState = {
   isFilterModalMenu: false,
-  isLoading: false,
 }
 
 const filterModalMenuStore: FilterModalMenuStoreCreator = (set) => ({

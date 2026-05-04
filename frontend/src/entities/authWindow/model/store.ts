@@ -10,7 +10,6 @@ interface IActions {
 
 interface IInitialState {
   isOpen: boolean
-  isLoading: boolean
 }
 
 interface AuthWindowStore extends IActions, IInitialState {}
@@ -22,7 +21,6 @@ type AuthWindowStoreCreator = StateCreator<
 
 const initialState: IInitialState = {
   isOpen: false,
-  isLoading: false,
 }
 
 const authWindowStore: AuthWindowStoreCreator = (set) => ({
@@ -44,21 +42,3 @@ const authWindowStore: AuthWindowStoreCreator = (set) => ({
 export const useAuthWindowStore = create<AuthWindowStore>()(
   immer(devtools(authWindowStore)),
 )
-
-// interface AuthWindowState {
-//   isOpen: boolean
-//   isCodePage: boolean
-//   isLoading: boolean
-
-//   open: () => void
-//   close: () => void
-// }
-
-// export const useAuthWindowStore = create<AuthWindowState>((set) => ({
-//   isOpen: false,
-//   isLoading: false,
-//   isCodePage: false,
-
-//   open: () => set({ isOpen: true }),
-//   close: () => set({ isOpen: false }),
-// }))

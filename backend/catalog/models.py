@@ -166,6 +166,7 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugMixin):
         on_delete=models.SET_NULL,
         null=True,
         verbose_name="Тип продукта",
+        related_name="products",
     )
     views = models.PositiveIntegerField("Просмотры", default=0, editable=False)
     category = models.ForeignKey(
