@@ -1,6 +1,6 @@
 "use client"
 
-import { AuthForm } from "@/features/AuthByPhone/ui/AuthForm"
+import { AuthForm } from "@/features/AuthByPhone/"
 import { Window } from "@/shared/ui/Window"
 import { useAuthWindowStore } from "@/entities/authWindow/"
 import { useShallow } from "zustand/shallow"

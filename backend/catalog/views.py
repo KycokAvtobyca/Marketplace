@@ -2,29 +2,16 @@ from django.db.models import Max, Min, Prefetch
 from rest_framework import views, viewsets
 from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
-from rest_framework.pagination import CursorPagination
 from rest_framework.request import Request
 from rest_framework.response import Response
-from rest_framework.settings import api_settings
+from users import models as mu
 
 from catalog import models as m
 from catalog.mixins import CategoryTreeOptimizerMixin
 
 from . import serializers as s
-
-
-class FilterValuesPagination(CursorPagination):
-    page_size = 10
-    cursor_query_param = "cursor"
-    ordering = "-id"
-    template = None
-
-
-class DefaultCursorPagination(CursorPagination):
-    page_size = api_settings.PAGE_SIZE
-    cursor_query_param = "cursor"
-    ordering = "-id"
-    template = None
+from .pagination import DefaultCursorPagination, FilterValuesPagination
+from .utils import get_limited_data
 
 
 class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
@@ -186,8 +173,9 @@ class FilterViewSet(viewsets.ViewSet):
     def types(self, request: Request, *args, **kwargs):
         # Собираем значения query param categories
         categories = request.query_params.getlist("categories")
+        print(categories)
 
-        if len(categories) < 1:
+        if not categories or len(categories) < 1 or categories[0] == "/":
             raise ValidationError(
                 {
                     "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
@@ -209,27 +197,57 @@ class FilterViewSet(viewsets.ViewSet):
         categories = request.query_params.getlist("categories")
         types = request.query_params.getlist("types")
 
-        if len(categories) < 1:
+        if not categories or len(categories) < 1 or categories[0] == "/":
             raise ValidationError(
                 {
                     "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
                 }
             )
 
-        if len(types) < 1:
+        if not types or len(types) < 1 or types[0] == "/":
             raise ValidationError(
                 {
                     "types": "Нужно передать 1 или более типов продукта для продолжения фильтрации"
                 }
             )
 
-        qs_values = m.Product.objects.filter(
+        # def get_paginated_data(qs, serializer_class):
+        #     page = paginator.paginate_queryset(qs, request)
+        #     serializer = serializer_class(
+        #         page, many=True, context={"request": request}
+        #     )
+
+        #     return {
+        #         "next": paginator.get_next_link(),
+        #         "previous": paginator.get_previous_link(),
+        #         "results": serializer.data,
+        #     }
+
+        qs = m.Product.objects.filter(
             category__slug__in=categories, product_type__slug__in=types
         ).distinct()
 
-        product_list_view = ProductViewSet.as_view(
-            {"get": "list"}, queryset=qs_values
+        brands = m.Brand.objects.filter(products__in=qs).distinct()
+        shops = mu.Shop.objects.filter(products__in=qs).distinct()
+        attributes = (
+            m.Attribute.objects.filter(products__in=qs)
+            .distinct()
+            .prefetch_related("attribute_values")
         )
+
+        data = {
+            "brands": get_limited_data(
+                request, brands, s.BrandSerializer, "brands"
+            ),
+            "shops": get_limited_data(
+                request, shops, s.ShopSerializer, "shops"
+            ),
+            "attributes": get_limited_data(
+                request, attributes, s.AttributesSerializer, "attributes"
+            ),
+        }
+
+        return Response(data)
 
 
 # class FiltersApiView(views.APIView):
@@ -244,7 +262,9 @@ class FilterViewSet(viewsets.ViewSet):
 #             #     ...
 #                 #     brand: брэнды
 #                 #     shop: магазин
-#                 #     attributes: атрибуты
+#                 #     attributes Атрибуты:
+#                       # attribute_values значения атрибутов
+#                       # ...
 #                 #     Цена
 
 #     def get(self, request):

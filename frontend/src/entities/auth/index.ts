@@ -1,5 +1,5 @@
 export type {
-  ApiAction,
+  AuthApiAction,
   ErrorResponseAuthData,
   ErrorResponseAuthFormData,
   RequestAuthData,

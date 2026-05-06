@@ -3,7 +3,7 @@ import {
   ErrorResponseAuthData,
   RequestAuthData,
   useAuthStore,
-  ApiAction,
+  AuthApiAction,
 } from "@/entities/auth"
 import { api } from "@/shared/api"
 import { isAxiosError } from "axios"
@@ -19,7 +19,7 @@ export const useAuth = () => {
     }: Record<
       keyof Omit<RequestAuthData, "code">,
       string
-    >): Promise<ApiAction> => {
+    >): Promise<AuthApiAction> => {
       try {
         await api.post<RequestAuthData>(ROUTES.AUTH.TOKEN, {
           phone_number: phone.startsWith("+7") ? phone : `+7${phone}`,

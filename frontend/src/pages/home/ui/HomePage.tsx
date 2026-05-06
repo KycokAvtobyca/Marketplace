@@ -1,7 +1,7 @@
 import { ProductListTitle } from "@/shared/ui/ProductListTitle"
 import { FilterModalMenu } from "@/widgets/FilterModalMenu"
 
-export const HomePage = () => {
+export const HomePage = async () => {
   return (
     <section className="catalog py-15">
       {/* <h1

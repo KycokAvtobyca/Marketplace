@@ -79,6 +79,56 @@ const CATALOG_APP_ROUTES = {
   },
 }
 
+const FILTERS_BASE_URL = CATALOG_BASE_URL + "filters/"
+
+const FILTERS_APP_ROUTES = {
+  CATEGORIES: (cursor: string = "") => {
+    const params = new URLSearchParams()
+
+    if (cursor) params.append("cursor", cursor)
+
+    const queryString = params.toString()
+    return queryString ? `categories/?${queryString}` : "categories/"
+  },
+  TYPES: (categories: string[] = [], cursor: string = "") => {
+    const params = new URLSearchParams()
+
+    if (cursor) params.append("cursor", cursor)
+
+    categories.forEach((cat) => {
+      if (cat) params.append("categories", cat)
+    })
+
+    const queryString = params.toString()
+    return queryString ? `types/?${queryString}` : "types/"
+  },
+  META: (
+    categories: string[] = [],
+    types: string[] = [],
+    metaAttrsStart?: Record<string, number>,
+  ) => {
+    const params = new URLSearchParams()
+
+    categories.forEach((cat) => {
+      if (cat) params.append("categories", cat)
+    })
+
+    types.forEach((type) => {
+      if (type) params.append("types", type)
+    })
+
+    if (metaAttrsStart)
+      for (const [key, value] of Object.entries(metaAttrsStart)) {
+        if (value !== undefined && value !== null) {
+          params.append(`${key}_start`, value.toString())
+        }
+      }
+
+    const queryString = params.toString()
+    return queryString ? `meta/?${queryString}` : "meta/"
+  },
+}
+
 const USER_BASE_URL = BASE_URL + "users/"
 
 const USER_APP_ROUTES = {
@@ -103,5 +153,6 @@ const USER_APP_ROUTES = {
 export const ROUTES = {
   HOME: BASE_URL,
   ...withPrefix(CATALOG_BASE_URL, CATALOG_APP_ROUTES),
+  FILTERS: { ...withPrefix(FILTERS_BASE_URL, FILTERS_APP_ROUTES) },
   ...withPrefix(USER_BASE_URL, USER_APP_ROUTES),
 } as const

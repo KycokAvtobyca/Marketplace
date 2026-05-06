@@ -11,6 +11,7 @@ from .models import (
     ProductType,
     ProductVariant,
 )
+from .utils import get_limited_data
 
 
 def find_root_in_memory(category_id, nodes_map):
@@ -68,16 +69,31 @@ class ProductTagsSerializer(serializers.ModelSerializer):
         exclude = ["id", "is_active"]
 
 
-class AttributesSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Attribute
-        exclude = ["id"]
-
-
 class AttributeValuesSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttributeValue
         exclude = ["attribute"]
+
+
+class AttributesSerializer(serializers.ModelSerializer):
+    # attribute_values = serializers.SerializerMethodField
+    values = serializers.SerializerMethodField()
+
+    def get_values(self, obj):
+        request = self.context.get("request")
+        if not request:
+            return []
+
+        return get_limited_data(
+            request,
+            obj.attribute_values.all(),
+            AttributeValuesSerializer,
+            f"value_{obj.slug}",
+        )
+
+    class Meta:
+        model = Attribute
+        exclude = ["id"]
 
 
 class ProductTypeSerializer(serializers.ModelSerializer):

@@ -63,4 +63,4 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
 class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
-        exclude = ["id", "is_active"]
+        exclude = ["id"]

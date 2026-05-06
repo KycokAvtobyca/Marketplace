@@ -7,3 +7,5 @@ export const api: AxiosInstance = axios.create({
   },
   withCredentials: true,
 })
+
+export type { DefaultErrorResponse, DefaultApiAction } from "./interfaces"

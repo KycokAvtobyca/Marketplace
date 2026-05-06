@@ -1,6 +1,6 @@
 import { useMutation } from "@tanstack/react-query"
 import {
-  ApiAction,
+  AuthApiAction,
   ErrorResponseAuthData,
   RequestAuthData,
   useAuthStore,
@@ -13,7 +13,7 @@ export const useSendSms = () => {
   const setIsCodeSent = useAuthStore((s) => s.setIsCodeSent)
 
   return useMutation({
-    mutationFn: async (phone: string): Promise<ApiAction> => {
+    mutationFn: async (phone: string): Promise<AuthApiAction> => {
       try {
         await api.post<RequestAuthData>(ROUTES.AUTH.SEND_SMS, {
           phone_number: phone.startsWith("+7") ? phone : `+7${phone}`,

@@ -20,7 +20,7 @@ import { errorHandler } from "@/shared/lib/error-handler"
 import { JSX, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import styles from "./AuthForm.module.scss"
-import { ApiAction, useAuthStore } from "@/entities/auth"
+import { AuthApiAction, useAuthStore } from "@/entities/auth"
 import { useAuth, useSendSms } from "@/entities/auth"
 import { THROTTLES } from "@/shared/config/throttles"
 import { OtpInput } from "@/shared/ui/OtpInput"
@@ -129,7 +129,7 @@ export const AuthForm: React.FC<Props> = ({
   // 6. Обработчики событий
 
   const errorFromAPISet = <T extends FieldValues>(
-    result: ApiAction,
+    result: AuthApiAction,
     setError: UseFormSetError<T>,
     formData: T,
     startCooldown: (customSeconds?: number | undefined) => void,

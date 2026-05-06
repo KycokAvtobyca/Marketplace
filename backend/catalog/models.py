@@ -118,7 +118,10 @@ class Attribute(SlugMixin):
 # Красный, XL, Кожа
 class AttributeValue(models.Model):
     attribute = models.ForeignKey(
-        Attribute, on_delete=models.CASCADE, verbose_name="Атрибут"
+        Attribute,
+        on_delete=models.CASCADE,
+        verbose_name="Атрибут",
+        related_name="attribute_values",
     )
     value = models.CharField(
         "Значение атрибута", max_length=50, validators=[MinLengthValidator(1)]
@@ -201,7 +204,10 @@ class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugMixin):
         editable=False,
     )
     attributes = models.ManyToManyField(
-        Attribute, verbose_name="Доступные атрибуты", blank=True
+        Attribute,
+        verbose_name="Доступные атрибуты",
+        blank=True,
+        related_name="products",
     )
 
     class Meta:

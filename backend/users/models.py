@@ -191,7 +191,7 @@ class Shop(SlugifiedNameMixin):
     )
     description = models.TextField("Описание", blank=True, max_length=500)
     is_active = models.BooleanField("Активен", default=False)
-    created_at = models.DateTimeField(auto_now_add=True)
+    data_time_create = models.DateTimeField(auto_now_add=True)
     image = models.ImageField(
         "Изображение",
         upload_to=UploadPath("shops"),

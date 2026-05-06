@@ -1,3 +1,5 @@
+import { DefaultErrorResponse, DefaultApiAction } from "@/shared/api"
+
 export interface RequestAuthData {
   phone_number?: string | [string]
   sms_code?: string | [string]
@@ -6,14 +8,15 @@ export interface RequestAuthData {
 
 export interface ErrorResponseAuthFormData extends RequestAuthData {}
 
-export interface ErrorResponseAuthData extends ErrorResponseAuthFormData {
+export interface ErrorResponseAuthData
+  extends ErrorResponseAuthFormData, DefaultErrorResponse {
   detail?: {
     message?: string
     seconds_left?: string
   }
 }
 
-export interface ApiAction {
+export interface AuthApiAction extends DefaultApiAction {
   success: boolean
   error?: { data: ErrorResponseAuthData }
 }
