@@ -13,7 +13,7 @@ def extract_token(url):
 
 
 class FilterValuesPagination(CursorPagination):
-    page_size = 1
+    page_size = 10
     cursor_query_param = "cursor"
     ordering = "-id"
     template = None

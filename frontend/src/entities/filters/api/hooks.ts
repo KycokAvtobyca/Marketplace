@@ -1,30 +1,46 @@
 import { api, DefaultErrorResponse } from "@/shared/api"
-import { useBaseFilter } from "./useBaseFilter"
+import { FilterVariables, useBaseFilter } from "./useBaseFilter"
 import {
   CategoriesResponse,
   ProductTypesResponse,
   MetaResponse,
+  FilterPropertiesResponse,
 } from "./interfaces"
 import { ROUTES } from "@/shared/config"
 
-export const useCategories = () => {
-  return useBaseFilter<CategoriesResponse, DefaultErrorResponse>({
-    fetcher: (vars) => api.get(ROUTES.FILTERS.CATEGORIES(vars.cursor)),
+export const useFilterProperties = (vars: FilterVariables) => {
+  return useBaseFilter<FilterPropertiesResponse>({
+    fetcher: (vars) =>
+      api.get(ROUTES.FILTERS.FILTER_PROPERTIES(vars.startPages)),
+    key: "filterProperties",
+    variables: vars,
   })
 }
 
-export const useProductTypes = () => {
-  return useBaseFilter<ProductTypesResponse, DefaultErrorResponse>({
+export const useCategories = (vars: FilterVariables) => {
+  return useBaseFilter<CategoriesResponse>({
+    fetcher: (vars) => api.get(ROUTES.FILTERS.CATEGORIES(vars.cursor)),
+    key: "categories",
+    variables: vars,
+  })
+}
+
+export const useProductTypes = (vars: FilterVariables) => {
+  return useBaseFilter<ProductTypesResponse>({
     fetcher: (vars) =>
       api.get(ROUTES.FILTERS.TYPES(vars.categories, vars.cursor)),
+    variables: vars,
+    key: "productTypes",
   })
 }
 
-export const useMetaAttrs = () => {
-  return useBaseFilter<MetaResponse, DefaultErrorResponse>({
+export const useMetaObjects = (vars: FilterVariables) => {
+  return useBaseFilter<MetaResponse>({
     fetcher: (vars) =>
       api.get(
         ROUTES.FILTERS.META(vars.categories, vars.types, vars.metaParams),
       ),
+    variables: vars,
+    key: "meta",
   })
 }

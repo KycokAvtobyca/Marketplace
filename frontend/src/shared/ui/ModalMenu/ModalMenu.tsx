@@ -47,13 +47,13 @@ export const ModalMenu: React.FC<ModalMenuProps> = ({
         createPortal(
           <div
             className={clsx(
-              `${className ?? ""} fixed inset-0 px-2 py-3 bg-default w-dvw h-dvh transition-opacity duration-300 z-30`,
+              `${className ?? ""} fixed inset-0 space-y-2 px-2 py-3 bg-default w-dvw h-dvh transition-opacity duration-300 z-30 overflow-auto`,
               isVisible
                 ? "opacity-100 pointer-events-auto"
                 : "opacity-0 pointer-events-none",
             )}
           >
-            <div className="w-full flex">
+            <div className="w-full flex mb-4">
               <button
                 onClick={toggleModalMenu}
                 className="ml-auto cursor-pointer"

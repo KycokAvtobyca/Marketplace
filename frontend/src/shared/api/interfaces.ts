@@ -1,4 +1,5 @@
 export interface DefaultErrorResponse {
+  message?: string
   detail?:
     | {
         message?: string
@@ -6,8 +7,8 @@ export interface DefaultErrorResponse {
     | string
 }
 
-export interface DefaultApiAction {
+export interface DefaultApiAction<T> {
   success: boolean
-  data?: any
+  data?: T
   error?: { data: DefaultErrorResponse }
 }

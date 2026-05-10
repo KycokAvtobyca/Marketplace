@@ -38,9 +38,15 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ["name", "slug", "children"]
 
     def get_children(self, obj):
-        depth = self.context.get("depth") or "0"
+        request = self.context.get("request")
+        depth = self.context.get("depth")
 
-        if depth is None or obj.level >= int(depth):
+        if depth is None and request:
+            depth = request.query_params.get("depth")
+
+        depth = depth or 0
+
+        if obj.level >= int(depth):
             return []
 
         all_nodes = self.context.get("all_nodes")
@@ -89,6 +95,7 @@ class AttributesSerializer(serializers.ModelSerializer):
             obj.attribute_values.all(),
             AttributeValuesSerializer,
             f"value_{obj.slug}",
+            "Значения атрибута",
         )
 
     class Meta:

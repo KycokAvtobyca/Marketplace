@@ -1,7 +1,5 @@
 from django.db.models import Max, Min, Prefetch
 from rest_framework import views, viewsets
-from rest_framework.decorators import action
-from rest_framework.exceptions import ValidationError
 from rest_framework.request import Request
 from rest_framework.response import Response
 from users import models as mu
@@ -11,7 +9,7 @@ from catalog.mixins import CategoryTreeOptimizerMixin
 
 from . import serializers as s
 from .pagination import DefaultCursorPagination, FilterValuesPagination
-from .utils import get_limited_data
+from .utils import get_limited_data, prefetch_tree_data
 
 
 class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
@@ -155,98 +153,125 @@ class PriceRangeAPIView(views.APIView):
         )
 
 
-class FilterViewSet(viewsets.ViewSet):
-    @action(detail=False, methods=["get"])
-    def categories(self, request: Request, *args, **kwargs):
-        params = request._request.GET.copy()
+# export interface DefaultApiAction<T> {
+#   success: boolean
+#   data?: T
+#   error?: { data: DefaultErrorResponse }
+# }
 
-        # По умолчанию ставим уровень вложенности 3
-        params["depth"] = 3
 
-        request._request.GET = params
+class FiltersViewSet(viewsets.ViewSet):
+    pagination_class = FilterValuesPagination
 
-        category_list_view = CategoryViewSet.as_view({"get": "list"})
+    def list(self, request, *args, **kwargs):
+        has_categories = "categories" in request.query_params
+        has_types = "types" in request.query_params
+        has_filter_properties = "filter_properties" in request.query_params
 
-        return category_list_view(request._request, *args, **kwargs)
-
-    @action(detail=False, methods=["get"])
-    def types(self, request: Request, *args, **kwargs):
-        # Собираем значения query param categories
-        categories = request.query_params.getlist("categories")
-        print(categories)
-
-        if not categories or len(categories) < 1 or categories[0] == "/":
-            raise ValidationError(
+        # Сценарий 1: Запрос всех свойств (Категории + Типы + Мета)
+        if has_filter_properties:
+            return Response(
                 {
-                    "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
+                    "categories": self._get_custom_categories(request),
+                    "product_types": self._get_custom_types(request),
+                    "meta": self.meta(request).data,
                 }
             )
 
-        qs = m.ProductType.objects.filter(
-            products__category__slug__in=categories
-        ).distinct()
+        # Сценарий 2: Делегирование
+        if has_types and has_categories:
+            return self.meta(request)
 
-        product_type_list_view = ProductTypeViewSet.as_view(
-            {"get": "list"}, queryset=qs
+        if has_categories:
+            # Если только категории, возвращаем типы (кастомно для списка)
+            return Response(self._get_custom_types(request))
+
+        # По умолчанию возвращаем категории
+        return Response({"categories": self._get_custom_categories(request)})
+
+    # --- Методы с кастомной пагинацией (используются в list) ---
+
+    def _get_custom_categories(self, request):
+        # Запрос всё еще ленивый, в базу не идет
+        queryset = m.Category.objects.filter(level=0)
+
+        # Описываем логику префетча для конкретного кусочка данных
+        def prepare_categories(instances, context):
+            # Передаем только 20 инстансов, а не 100500
+            updated_context = prefetch_tree_data(
+                instances, context, relation_path=""
+            )
+            return instances, updated_context
+
+        return get_limited_data(
+            request,
+            queryset,
+            s.CategorySerializer,
+            prefix="category",
+            name="Категория",
+            context={"depth": 3},
+            prepare_results=prepare_categories,
         )
 
-        return product_type_list_view(request._request, *args, **kwargs)
+    def _get_custom_types(self, request):
+        categories = request.query_params.getlist("categories")
+        qs = m.ProductType.objects.all()
 
-    @action(detail=False, methods=["get"])
-    def meta(self, request: Request, *args, **kwargs):
+        if categories and categories[0] != "/":
+            # Используем distinct только если есть фильтрация, чтобы не грузить БД
+            qs = qs.filter(products__category__slug__in=categories).distinct()
+
+        return get_limited_data(
+            request,
+            qs,
+            s.ProductTypeSerializer,
+            prefix="product_tag",
+            name="Тип товара",
+        )
+
+    # ------
+
+    def meta(self, request, *args, **kwargs):
         categories = request.query_params.getlist("categories")
         types = request.query_params.getlist("types")
 
-        if not categories or len(categories) < 1 or categories[0] == "/":
-            raise ValidationError(
-                {
-                    "categories": "Нужно передать 1 или более категорий для продолжения фильтрации"
-                }
-            )
+        # Фильтрация QuerySet продуктов
+        product_qs = m.Product.objects.all()
+        if categories and categories[0] != "/":
+            product_qs = product_qs.filter(
+                category__slug__in=categories
+            ).distinct()
+            if types and types[0] != "/":
+                product_qs = product_qs.filter(
+                    product_type__slug__in=types
+                ).distinct()
 
-        if not types or len(types) < 1 or types[0] == "/":
-            raise ValidationError(
-                {
-                    "types": "Нужно передать 1 или более типов продукта для продолжения фильтрации"
-                }
-            )
-
-        # def get_paginated_data(qs, serializer_class):
-        #     page = paginator.paginate_queryset(qs, request)
-        #     serializer = serializer_class(
-        #         page, many=True, context={"request": request}
-        #     )
-
-        #     return {
-        #         "next": paginator.get_next_link(),
-        #         "previous": paginator.get_previous_link(),
-        #         "results": serializer.data,
-        #     }
-
-        qs = m.Product.objects.filter(
-            category__slug__in=categories, product_type__slug__in=types
-        ).distinct()
-
-        brands = m.Brand.objects.filter(products__in=qs).distinct()
-        shops = mu.Shop.objects.filter(products__in=qs).distinct()
-        attributes = (
-            m.Attribute.objects.filter(products__in=qs)
-            .distinct()
-            .prefetch_related("attribute_values")
-        )
-
+        # Формируем блоки данных
         data = {
             "brands": get_limited_data(
-                request, brands, s.BrandSerializer, "brands"
+                request,
+                m.Brand.objects.filter(products__in=product_qs).distinct(),
+                s.BrandSerializer,
+                "brands",
+                "Бренды",
             ),
             "shops": get_limited_data(
-                request, shops, s.ShopSerializer, "shops"
+                request,
+                mu.Shop.objects.filter(products__in=product_qs).distinct(),
+                s.ShopSerializer,
+                "shops",
+                "Магазины",
             ),
             "attributes": get_limited_data(
-                request, attributes, s.AttributesSerializer, "attributes"
+                request,
+                m.Attribute.objects.filter(products__in=product_qs)
+                .distinct()
+                .prefetch_related("attribute_values"),
+                s.AttributesSerializer,
+                "attributes",
+                "Атрибуты",
             ),
         }
-
         return Response(data)
 
 

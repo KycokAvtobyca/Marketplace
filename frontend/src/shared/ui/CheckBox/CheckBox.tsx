@@ -1,19 +1,28 @@
-import { ReactNode } from "react"
 import styles from "./CheckBox.module.scss"
 
-interface CheckBoxProps {
-  children?: ReactNode
+interface CheckBoxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  children?: React.ReactNode
 }
 
-export const CheckBox: React.FC<CheckBoxProps> = ({ children }) => {
+export const CheckBox: React.FC<CheckBoxProps> = ({
+  children,
+  name,
+  checked,
+  onChange,
+  ...props
+}) => {
   return (
-    <label className="custom-checkbox text-center space-x-1 flex items-center">
+    <label className="custom-checkbox text-center space-x-1 flex items-center cursor-pointer">
       <input
         type="checkbox"
+        name={name}
+        checked={checked}
+        onChange={onChange}
         className={`custom-checkbox__input ${styles.inputHidden}`}
+        {...props}
       />
       <span className={`custom-checkbox__checkmark ${styles.checkmark}`}></span>
-      {children ?? null}
+      {children && <span className="custom-checkbox__label">{children}</span>}
     </label>
   )
 }

@@ -1,25 +1,21 @@
 "use client"
 
-import { useFilterModalMenuStore } from "@/entities/filterMenuModal"
+import { useFilterModalMenuStore } from "@/entities/filters"
 import { HamburgerButton } from "@/shared/ui/HamburgerButton"
 import { ModalMenu } from "@/shared/ui/ModalMenu"
-import { CheckBox } from "@/shared/ui/CheckBox"
-import {
-  useCategories,
-  useProductTypes,
-  useMetaAttrs,
-} from "@/entities/filters/"
-import { useEffect } from "react"
 import { FilterGroupList } from "./FilterGroupList"
+import clsx from "clsx"
 
 interface FilterModalMenuProps {
   classNameHamburgerButton?: string
   classNameModalMenu?: string
+  classNameFilterGroupList?: string
 }
 
 export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
   classNameHamburgerButton,
   classNameModalMenu,
+  classNameFilterGroupList,
 }) => {
   const { isFilterModalMenu, toggleFilterModalMenu } = useFilterModalMenuStore()
   // const { mutateAsync: mutateAsyncCategories } = useCategories()

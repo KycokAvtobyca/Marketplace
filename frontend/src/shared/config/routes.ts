@@ -1,3 +1,5 @@
+import { FilterPropertiesData } from "./routesInterfaces"
+
 type Prefixed<T> = {
   [K in keyof T]: T[K] extends string
     ? string
@@ -82,13 +84,23 @@ const CATALOG_APP_ROUTES = {
 const FILTERS_BASE_URL = CATALOG_BASE_URL + "filters/"
 
 const FILTERS_APP_ROUTES = {
+  FILTER_PROPERTIES: (startPages: FilterPropertiesData[] = []) => {
+    const params = new URLSearchParams({ filter_properties: "true" })
+
+    startPages.forEach((data) => {
+      if (data) params.append(data.prefix, data.pageNumber)
+    })
+
+    const queryString = params.toString()
+    return queryString ? `?${queryString}` : ""
+  },
   CATEGORIES: (cursor: string = "") => {
     const params = new URLSearchParams()
 
     if (cursor) params.append("cursor", cursor)
 
     const queryString = params.toString()
-    return queryString ? `categories/?${queryString}` : "categories/"
+    return queryString ? `?${queryString}` : ""
   },
   TYPES: (categories: string[] = [], cursor: string = "") => {
     const params = new URLSearchParams()
@@ -100,7 +112,7 @@ const FILTERS_APP_ROUTES = {
     })
 
     const queryString = params.toString()
-    return queryString ? `types/?${queryString}` : "types/"
+    return queryString ? `?${queryString}` : "/"
   },
   META: (
     categories: string[] = [],
@@ -125,7 +137,7 @@ const FILTERS_APP_ROUTES = {
       }
 
     const queryString = params.toString()
-    return queryString ? `meta/?${queryString}` : "meta/"
+    return queryString ? `?${queryString}` : ""
   },
 }
 

@@ -13,7 +13,7 @@ router.register("attributes", v.AttributesViewSet)
 router.register("attribute-values", v.AttributeValuesViewSet)
 router.register("product-types", v.ProductTypeViewSet)
 router.register("sku", v.ProductVariantViewSet, basename="sku")
-router.register("filters", v.FilterViewSet, basename="filters")
+router.register("filters", v.FiltersViewSet, basename="catalog")
 
 
 # Вложенные роутеры

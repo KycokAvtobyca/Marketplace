@@ -16,7 +16,7 @@ export interface ErrorResponseAuthData
   }
 }
 
-export interface AuthApiAction extends DefaultApiAction {
+export interface AuthApiAction extends DefaultApiAction<undefined> {
   success: boolean
   error?: { data: ErrorResponseAuthData }
 }
