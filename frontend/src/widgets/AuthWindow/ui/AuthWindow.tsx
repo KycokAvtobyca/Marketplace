@@ -59,7 +59,7 @@ export const AuthWindow = () => {
       toggleWindow={toggle}
       backRedirect={
         !isCodeStep ? (
-          <div className="w-full">
+          <div className="w-full flex justify-end">
             {isPossibleSwitchBackToSMS ? (
               <button
                 onClick={() => {
@@ -67,12 +67,12 @@ export const AuthWindow = () => {
                   setSwitchBackToSMS(false)
                 }}
                 type="button"
-                className="ml-auto"
+                className="cursor-pointer"
               >
                 <Icon.ARROWRIGHT />
               </button>
             ) : (
-              <button onClick={toggle} className="ml-auto">
+              <button onClick={toggle} type="button" className="cursor-pointer">
                 <Icon.CLOSE />
               </button>
             )}
@@ -84,7 +84,8 @@ export const AuthWindow = () => {
                 setIsCodeStep(false)
                 setSwitchBackToSMS(true)
               }}
-              className="mr-auto"
+              type="button"
+              className="mr-auto cursor-pointer"
             >
               <Icon.ARROWLEFT />
             </button>

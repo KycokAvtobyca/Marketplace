@@ -28,13 +28,15 @@ SECRET_KEY = (
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "0.0.0.0"]
 INTERNAL_IPS = ["127.0.0.1"]
 
 
 # Application definition
 
 INSTALLED_APPS = [
+    "admin_interface",
+    "colorfield",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -43,11 +45,11 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "debug_toolbar",
     "rest_framework",
-    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_spectacular",
     "phonenumber_field",
     "django_extensions",
+    "import_export",
     "common",
     "users",
     "info",
@@ -100,7 +102,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "marketplace",
+        "NAME": "marketplace2",
         "USER": "postgres",
         "PASSWORD": "Aq27z_D3P",
         "HOST": "127.0.0.1",
@@ -148,7 +150,9 @@ STATIC_ROOT = BASE_DIR / "static"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://127.0.0.1:3000",
+    "http://0.0.0.0:8001",
 ]
 
 CORS_ALLOW_CREDENTIALS = True
@@ -263,4 +267,34 @@ SPECTACULAR_SETTINGS = {
     "SERVE_AUTHENTICATION": [
         "api.authentication.HttpOnlyJWTAuthentication",
     ],
+}
+
+# Django Admin Interface Configuration
+# Красивое оформление админки с цветовой темой
+ADMIN_INTERFACE = {
+    "ADMIN_THEME": "light",  # light или dark
+    "ADMIN_HEADER_BACKGROUND": "#5B2E71",  # oklch(32.17% 0.16 302.7) фиолетово-розовый
+    "ADMIN_FOOTER_BACKGROUND": "#5B2E71",
+    "ADMIN_SIDEBAR_BACKGROUND": "#F8F9FA",
+    "ADMIN_SIDEBAR_TEXT_COLOR": "#333333",
+    "ADMIN_SIDEBAR_TEXT_HOVER_COLOR": "#5B2E71",
+    "ADMIN_SIDEBAR_ACTIVE_BACKGROUND": "#E8D4F0",
+    "ADMIN_SIDEBAR_ACTIVE_TEXT_COLOR": "#5B2E71",
+    "ADMIN_LOGO": None,
+    "ADMIN_LOGO_DARK": None,
+    "ADMIN_TITLE": "Floppi Admin Panel",
+    "ADMIN_BREADCRUMBS": True,
+    "ADMIN_ENVIRONMENT": None,
+    "ADMIN_ENVIRONMENT_BADGE": True,
+    "ADMIN_ENVIRONMENT_TEXT": "",
+    "ADMIN_ENVIRONMENT_COLOR": "blue",
+    "ADMIN_ENVIRONMENT_LINK": "",
+    "ADMIN_HELP_REFERENCE": "https://docs.djangoproject.com/",
+    "ADMIN_SEARCH_BAR": True,
+    "ADMIN_RICH_EDITING_ENABLED": True,
+    "ADMIN_DATETIME_FORMAT": "d.m.Y H:i",
+    "ADMIN_DATE_FORMAT": "d.m.Y",
+    "ADMIN_TIME_FORMAT": "H:i",
+    "ADMIN_ALLOW_THEME_EDIT": True,
+    "ADMIN_EXTRA_BUTTONS": [],
 }

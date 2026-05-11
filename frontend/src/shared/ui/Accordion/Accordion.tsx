@@ -6,7 +6,7 @@ import { useMountTransition } from "@/shared/lib/hooks"
 import clsx from "clsx"
 
 export type AccordionItemProps = {
-  title?: string
+  title?: ReactNode // ЗАМЕНИ string на ReactNode
   content?: ReactNode
   isOpen?: boolean
   transitionDuration?: number
@@ -44,34 +44,54 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
   return (
     <div
       className={clsx(
-        classNameAccordionItemOuterDiv
-          ? classNameAccordionItemOuterDiv
-          : "bg-brand-main/20",
-        "rounded-xl last:mb-0 mb-2 overflow-hidden",
+        "mb-1 overflow-hidden transition-all duration-300",
+        // Вместо бордера — легкий фон только когда открыто, либо оставляем прозрачным
+        isOpen ? "bg-brand-main/5" : "bg-transparent",
+        classNameAccordionItemOuterDiv,
       )}
     >
       <button
         type="button"
         onClick={onClickButton}
-        className={
-          "border-2 rounded-xl border-brand-main/20 flex w-full justify-between p-2 items-center"
-        }
+        // УБРАЛИ border-2. Добавили hover:bg и плавный переход цвета
+        className="flex w-full justify-between p-2.5 items-center text-sm font-medium transition-colors hover:bg-brand-main/10 rounded-xl outline-none"
       >
-        <span>{title}</span>
-        {isOpen ? <Icon.ARROWUP /> : <Icon.ARROWDOWN />}
-      </button>
-      {shouldRender && (
-        <div
-          style={{ transitionDuration: `${transitionDuration}ms` }}
-          ref={divSwitchRef}
+        <span
           className={clsx(
-            // 1680px = 240 * 7, а 240 - это 4 закрытых аккордиона
-            `grid transition-all overflow-auto max-h-420 ease`,
-            isVisible ? "grid-rows-[1fr]" : "grid-rows-[0fr] overflow-hidden",
-            // isVisible ? "overflow-y-auto" : "overflow-hidden",
+            "transition-colors",
+            isOpen ? "text-brand-main" : "text-slate-700",
           )}
         >
-          <div className={clsx("min-h-0 space-y-2")}>{content}</div>
+          {title}
+        </span>
+
+        {/* АНИМАЦИЯ СТРЕЛКИ */}
+        <div
+          className={clsx(
+            "transition-transform duration-300 ease-in-out text-slate-400",
+            isOpen && "rotate-180 text-brand-main",
+          )}
+        >
+          <Icon.ARROWDOWN />
+        </div>
+      </button>
+
+      {shouldRender && (
+        <div
+          ref={divSwitchRef}
+          className={clsx(
+            "grid transition-all duration-300 ease-in-out",
+            isVisible
+              ? "grid-rows-[1fr] opacity-100"
+              : "grid-rows-[0fr] opacity-0 overflow-hidden",
+          )}
+        >
+          <div className="min-h-0">
+            {/* Тонкая, почти незаметная линия иерархии */}
+            <div className="border-l-2 border-brand-main/20 ml-4 pl-3 py-1 space-y-1">
+              {content}
+            </div>
+          </div>
         </div>
       )}
     </div>

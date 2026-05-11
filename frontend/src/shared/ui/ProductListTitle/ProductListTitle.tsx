@@ -1,11 +1,11 @@
-interface ProductListTitleProps {
+interface PageTitleProps {
   className?: string
   title?: string
 }
 
-export const ProductListTitle: React.FC<ProductListTitleProps> = ({
+export const PageTitle: React.FC<PageTitleProps> = ({
   className,
-  title = "Все товары",
+  title = "Главная страница",
 }) => {
   return <h2 className={`${className} text-xl`}>{title}</h2>
 }

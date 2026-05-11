@@ -19,7 +19,7 @@ export default async function RootLayout({
       <html lang="ru">
         <body className="items-center min-h-screen flex flex-col bg-default text-brand-main">
           <div className="max-w-5xl p-3 w-full relative">
-            <main className="grow">
+            <main className="grow space-y-5">
               <div className="flex min-[450px]:hidden">{/* Header 2 */}</div>
               {children}
             </main>

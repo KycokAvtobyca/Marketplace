@@ -5,10 +5,10 @@ from .models import SiteConfiguration
 
 @admin.register(SiteConfiguration)
 class SiteConfigurationAdmin(admin.ModelAdmin):
-    # Запрещаем удалять настройки, чтобы сайт не упал
+    list_display = ("id", "max_discount_percentage")
+
     def has_delete_permission(self, request, obj=None):
         return False
 
-    # Запрещаем добавлять новые, если одна уже есть
     def has_add_permission(self, request):
         return not SiteConfiguration.objects.exists()

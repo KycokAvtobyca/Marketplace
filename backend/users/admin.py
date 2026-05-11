@@ -1,86 +1,81 @@
 from django.contrib import admin
-from django.contrib.auth.admin import UserAdmin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+from import_export.admin import ImportExportModelAdmin
 
 from .forms import CustomUserChangeForm, CustomUserCreationForm
 from .models import CustomUser, Shop, SMSCode
 
 
 @admin.register(CustomUser)
-class CustomUserAdmin(UserAdmin):
-    # Написать самому
-
+class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
     add_form = CustomUserCreationForm
     form = CustomUserChangeForm
 
-    # 1. Поля, которые отображаются в общем списке пользователей
     list_display = (
         "phone_number",
         "name",
-        "last_name",
-        "middle_name",
-        "is_staff",
         "is_active",
+        "is_staff",
+        "date_time_create",
     )
 
-    # 2. Поля, по которым можно искать (УБРАЛИ username)
     search_fields = (
         "phone_number",
         "name",
-        "last_name",
-        "middle_name",
         "email",
     )
 
-    # 3. Сортировка по умолчанию
+    list_filter = (
+        "is_staff",
+        "is_active",
+        "date_time_create",
+    )
+
     ordering = ("-date_time_create",)
-
-    # 4. Настройка экрана РЕДАКТИРОВАНИЯ существующего пользователя
-    fieldsets = (
-        (None, {"fields": ("phone_number", "password")}),
-        (
-            "Персональная информация",
-            {
-                "fields": (
-                    "name",
-                    "last_name",
-                    "middle_name",
-                    "email",
-                    "address",
-                    "address_data",
-                )
-            },
-        ),
-        (
-            "Права доступа",
-            {
-                "fields": (
-                    "is_active",
-                    "is_staff",
-                    "is_superuser",
-                    "groups",
-                    "user_permissions",
-                )
-            },
-        ),
-        ("Важные даты", {"fields": ("last_login",)}),
-        # Поля date_time_create и date_time_update добавлять сюда нельзя,
-        # так как они auto_now / auto_now_add (Django сам их контролирует)
-    )
-
-    # 5. Настройка экрана СОЗДАНИЯ нового пользователя
-    add_fieldsets = (
-        (
-            None,
-            {
-                "classes": ("wide",),
-                # Используем phone_number вместо username.
-                # Для стандартной формы создания нужны два поля пароля.
-                "fields": ("phone_number", "name", "last_name"),
-            },
-        ),
-    )
+    list_per_page = 25
+    date_hierarchy = "date_time_create"
 
     readonly_fields = ("date_time_create", "date_time_update", "last_login")
 
 
-admin.site.register([SMSCode, Shop])
+@admin.register(Shop)
+class ShopAdmin(ImportExportModelAdmin):
+    list_display = (
+        "name",
+        "owner",
+        "is_active",
+        "data_time_create",
+    )
+
+    search_fields = ("name", "owner__name", "owner__phone_number")
+
+    list_filter = ("is_active", "data_time_create")
+
+    readonly_fields = ("data_time_create",)
+    prepopulated_fields = {"slug": ("name",)}
+    list_per_page = 20
+
+
+@admin.register(SMSCode)
+class SMSCodeAdmin(ImportExportModelAdmin):
+    list_display = (
+        "phone_number",
+        "code",
+        "date_time_create",
+    )
+
+    search_fields = ("phone_number",)
+
+    list_filter = ("date_time_create",)
+
+    readonly_fields = ("phone_number", "code", "date_time_create")
+    list_per_page = 50
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

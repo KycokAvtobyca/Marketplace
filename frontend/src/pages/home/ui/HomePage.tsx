@@ -1,27 +1,31 @@
-import { ProductListTitle } from "@/shared/ui/ProductListTitle"
+import { PageTitle } from "@/shared/ui/ProductListTitle"
 import { FilterModalMenu } from "@/widgets/FilterModalMenu"
+import { FilterSidebar } from "@/widgets/FilterSidebar"
+import { ProductList } from "@/widgets/ProductList"
 
 export const HomePage = async () => {
   return (
-    <section className="catalog py-15">
-      {/* <h1
-        id="hero-heading"
-        className="text-4xl font-extrabold text-blue-600 mb-6 lg:text-5xl"
-      >
-        Маркетплейс Сиська
-      </h1>
-      <p className="text-lg text-slate-600 max-w-2xl">
-        Здесь скоро появятся товары, которые мы будем получать по API из Django
-        + DRF бэкенда.
-      </p> */}
+    <section className="catalog space-y-4">
       <header className="catalog__header">
         <div className="flex justify-between items-center">
-          <ProductListTitle className="catalog__title" />
-          <FilterModalMenu classNameHamburgerButton="catalog__hamburger-button" />
+          <PageTitle className="catalog__title" />
+
+          <div className="block min-[800px]:hidden">
+            <FilterModalMenu classNameHamburgerButton="catalog__hamburger-button" />
+          </div>
         </div>
 
         <div className="catalog-line h-0.5 w-full rounded-full bg-brand-main mt-1 opacity-80" />
       </header>
+
+      {/* Основной контент*/}
+      <div className="flex gap-4">
+        <FilterSidebar />
+
+        <main className="grow min-w-0">
+          <ProductList />
+        </main>
+      </div>
     </section>
   )
 }

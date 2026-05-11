@@ -6,6 +6,15 @@
     /* clamp не даст шрифту стать слишком мелким или слишком огромным */
     font-size: clamp(3px, 4vw, 16px);
   }
+
+  button {
+    cursor: pointer;
+  }
+
+  /* Не забываем про заблокированные кнопки */
+  button:disabled {
+    cursor: not-allowed;
+  }
 }
 
 @layer utilities {

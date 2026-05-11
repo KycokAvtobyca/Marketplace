@@ -14,6 +14,7 @@ def get_limited_data(
     name,
     context=None,
     prepare_results=None,
+    list_key="children",
     limit=FilterValuesPagination.page_size,
 ):
     try:
@@ -47,7 +48,7 @@ def get_limited_data(
             "prefix": f"{prefix}_start",
             "next": start + limit if has_next else None,
             "previous": previous,
-            "results": serializer_class(
+            list_key: serializer_class(
                 results, many=True, context=full_context
             ).data,
         }
@@ -58,7 +59,7 @@ def get_limited_data(
             "prefix": f"{prefix}_start",
             "next": None,
             "previous": None,
-            "results": serializer_class(
+            list_key: serializer_class(
                 qs[:limit], many=True, context={"request": request}
             ).data,
         }

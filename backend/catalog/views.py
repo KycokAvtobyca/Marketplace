@@ -1,4 +1,12 @@
-from django.db.models import Max, Min, Prefetch
+from django.db.models import (
+    Avg,
+    Max,
+    Min,
+    OuterRef,
+    Prefetch,
+    Subquery,
+    Sum,
+)
 from rest_framework import views, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
@@ -10,6 +18,49 @@ from catalog.mixins import CategoryTreeOptimizerMixin
 from . import serializers as s
 from .pagination import DefaultCursorPagination, FilterValuesPagination
 from .utils import get_limited_data, prefetch_tree_data
+
+
+class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
+    # Используем легкий сериализатор
+    serializer_class = s.ProductCatalogSerializer
+    pagination_class = DefaultCursorPagination
+
+    def get_queryset(self):
+        user = self.request.user
+
+        # 1. Готовим запрос вариантов С УЧЕТОМ скидок (используем ваш метод)
+        # Мы фильтруем по OuterRef("pk"), чтобы привязать варианты к конкретному товару
+        variants_with_prices = m.ProductVariant.objects.filter(
+            product=OuterRef("pk"), is_active=True
+        ).with_prices(user=user)
+
+        # 2. Подзапрос для картинки (как и был)
+        main_image_sq = m.ProductImage.objects.filter(
+            variant__product=OuterRef("pk"), is_main=True
+        ).values("image")
+
+        return (
+            m.Product.objects.filter(shop__is_active=True)
+            .annotate(
+                # Минимальная цена: берем из подзапроса с аннотированными ценами
+                # Сортируем по вычисленной цене и берем первое значение
+                api_price=Subquery(
+                    variants_with_prices.order_by("discounted_price").values(
+                        "discounted_price"
+                    )[:1]
+                ),
+                # Старая цена (базовая)
+                api_old_price=Min("variants__price"),
+                # Картинка
+                api_image=Subquery(main_image_sq[:1]),
+                # Средний рейтинг (лучше считать напрямую через связь)
+                api_rating=Avg("variants__reviews__rating"),
+                # Суммарный остаток (ОБЯЗАТЕЛЬНО Sum вместо Count)
+                api_stock=Sum("variants__stock"),
+            )
+            .select_related("brand", "shop")
+            .distinct()
+        )
 
 
 class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
@@ -270,6 +321,7 @@ class FiltersViewSet(viewsets.ViewSet):
                 s.AttributesSerializer,
                 "attributes",
                 "Атрибуты",
+                list_key="children",
             ),
         }
         return Response(data)

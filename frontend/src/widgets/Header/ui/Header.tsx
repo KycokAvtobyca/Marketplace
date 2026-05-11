@@ -8,7 +8,7 @@ export const Header = () => {
     <header
       className="
       flex h-[8vw] min-h-12 w-full max-w-5xl max-h-12 items-center flex-row justify-between
-      gap-[3vw] backdrop-blur rounded-xl sticky p-2 py-1.5 bg-[#edede295]"
+      gap-[3vw] backdrop-blur rounded-xl sticky p-2 py-1.5 bg-brand-main/10"
     >
       <div className="hidden min-[450px]:block">
         <Logo />

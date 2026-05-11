@@ -76,16 +76,18 @@ class ProductTagsSerializer(serializers.ModelSerializer):
 
 
 class AttributeValuesSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="value")
+
     class Meta:
         model = AttributeValue
-        exclude = ["attribute"]
+        fields = ["id", "name"]
 
 
 class AttributesSerializer(serializers.ModelSerializer):
     # attribute_values = serializers.SerializerMethodField
-    values = serializers.SerializerMethodField()
+    children = serializers.SerializerMethodField()
 
-    def get_values(self, obj):
+    def get_children(self, obj):
         request = self.context.get("request")
         if not request:
             return []
@@ -96,11 +98,12 @@ class AttributesSerializer(serializers.ModelSerializer):
             AttributeValuesSerializer,
             f"value_{obj.slug}",
             "Значения атрибута",
+            # list_key здесь не передаем, сработает дефолт "children"
         )
 
     class Meta:
         model = Attribute
-        exclude = ["id"]
+        fields = ["name", "slug", "is_active", "children"]
 
 
 class ProductTypeSerializer(serializers.ModelSerializer):
@@ -124,6 +127,42 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductVariant
         exclude = ["price"]
+
+
+class ProductCatalogSerializer(serializers.ModelSerializer):
+    # Указываем source, чтобы DRF знал, из какого аннотированного поля брать данные
+    price = serializers.DecimalField(
+        source="api_price", max_digits=10, decimal_places=2
+    )
+    old_price = serializers.DecimalField(
+        source="api_old_price", max_digits=10, decimal_places=2
+    )
+    image = serializers.SerializerMethodField()
+    rating = serializers.FloatField(source="api_rating")
+    stock = serializers.IntegerField(source="api_stock")
+
+    def get_image(self, obj):
+        # obj.api_image содержит строку, например "products/2026/05/10/photo.jpg"
+        if obj.api_image:
+            request = self.context.get("request")
+            # Формируем полный URL через MEDIA_URL
+            image_url = f"/media/{obj.api_image}"
+            if request is not None:
+                return request.build_absolute_uri(image_url)
+            return image_url
+        return None
+
+    class Meta:
+        model = Product
+        fields = [
+            "id",
+            "name",
+            "price",
+            "old_price",
+            "image",
+            "rating",
+            "stock",
+        ]
 
 
 class ProductSerializer(serializers.ModelSerializer):

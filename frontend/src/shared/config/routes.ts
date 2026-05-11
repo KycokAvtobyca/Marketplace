@@ -75,6 +75,7 @@ const CATALOG_APP_ROUTES = {
     ROOT: "products/",
     RETRIEVE: (id: number) => `products/${id}/`,
   },
+  PRODUCTSCATALOG: "product-catalog/",
   SKU: {
     ROOT: "sku/",
     RETRIEVE: (id: number) => `sku/${id}/`,
@@ -162,9 +163,30 @@ const USER_APP_ROUTES = {
   },
 }
 
+const CART_BASE_URL = BASE_URL + "cart/"
+
+const CART_APP_ROUTES = {
+  GET_CONTENTS: "get_cart_contents/",
+  ADD_ITEM: "add_item/",
+  UPDATE_ITEM: "update_item/",
+  REMOVE_ITEM: "remove_item/",
+  CLEAR: "clear/",
+}
+
+const FAVORITES_BASE_URL = BASE_URL + "favorites/"
+
+const FAVORITES_APP_ROUTES = {
+  GET_FAVORITES: "get_favorites/",
+  ADD_ITEM: "add_item/",
+  REMOVE_ITEM: "remove_item/",
+  CLEAR: "clear/",
+}
+
 export const ROUTES = {
   HOME: BASE_URL,
   ...withPrefix(CATALOG_BASE_URL, CATALOG_APP_ROUTES),
   FILTERS: { ...withPrefix(FILTERS_BASE_URL, FILTERS_APP_ROUTES) },
   ...withPrefix(USER_BASE_URL, USER_APP_ROUTES),
+  CART: { ...withPrefix(CART_BASE_URL, CART_APP_ROUTES) },
+  FAVORITES: { ...withPrefix(FAVORITES_BASE_URL, FAVORITES_APP_ROUTES) },
 } as const

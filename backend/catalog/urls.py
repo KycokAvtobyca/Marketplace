@@ -7,6 +7,9 @@ from catalog import views as v
 router = DefaultRouter()
 router.register("categories", v.CategoryViewSet, basename="category")
 router.register("products", v.ProductViewSet, basename="product")
+router.register(
+    "product-catalog", v.ProductCatalogViewSet, basename="product-catalog"
+)
 router.register("brands", v.BrandViewSet)
 router.register("product-tags", v.ProductTagViewSet)
 router.register("attributes", v.AttributesViewSet)

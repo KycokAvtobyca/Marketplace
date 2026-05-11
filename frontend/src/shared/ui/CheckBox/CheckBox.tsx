@@ -9,10 +9,13 @@ export const CheckBox: React.FC<CheckBoxProps> = ({
   name,
   checked,
   onChange,
+  className,
   ...props
 }) => {
   return (
-    <label className="custom-checkbox text-center space-x-1 flex items-center cursor-pointer">
+    <label
+      className={`custom-checkbox text-center space-x-1 flex items-center cursor-pointer ${className}`}
+    >
       <input
         type="checkbox"
         name={name}

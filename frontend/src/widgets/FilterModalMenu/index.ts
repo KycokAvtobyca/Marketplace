@@ -1,3 +1,3 @@
 export { FilterModalMenu } from "./ui/FilterModalMenu"
-export { FilterGroupList } from "./ui/FilterGroupList"
-export { FilterList } from "./ui/FilterList"
+export { FilterGroupList } from "../../features/Filters/ui/FilterGroupList"
+export { FilterList } from "../../features/Filters/ui/FilterList"

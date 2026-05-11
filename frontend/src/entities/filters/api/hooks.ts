@@ -5,7 +5,7 @@ import {
   ProductTypesResponse,
   MetaResponse,
   FilterPropertiesResponse,
-} from "./interfaces"
+} from "../model/types"
 import { ROUTES } from "@/shared/config"
 
 export const useFilterProperties = (vars: FilterVariables) => {

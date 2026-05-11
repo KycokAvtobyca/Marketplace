@@ -1,1 +1,1 @@
-export { ProductListTitle } from "./ProductListTitle"
+export { PageTitle } from "./ProductListTitle"
