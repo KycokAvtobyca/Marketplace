@@ -348,10 +348,67 @@ class MyShopView(APIView):
         return Response(ShopSerializer(shop).data)
 
 
-class ShopViewSet(viewsets.ReadOnlyModelViewSet):
+from rest_framework.permissions import BasePermission
+
+
+class IsSuperuserOrReadOnly(BasePermission):
+    """
+    Разрешает суперпользователю полный доступ.
+    Остальным - только чтение.
+    """
+    def has_permission(self, request, view):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        return request.user and request.user.is_superuser
+    
+    def has_object_permission(self, request, view, obj):
+        if request.method in ['GET', 'HEAD', 'OPTIONS']:
+            return True
+        return request.user and request.user.is_superuser
+
+
+class ShopViewSet(viewsets.ModelViewSet):
     lookup_field = "slug"
-    queryset = Shop.objects.filter(is_active=True)
+    queryset = Shop.objects.all()
     serializer_class = ShopSerializer
+    permission_classes = [IsSuperuserOrReadOnly]
+    
+    def get_queryset(self):
+        """
+        Суперпользователь видит все магазины.
+        Остальные видят только активные магазины.
+        """
+        if self.request.user and self.request.user.is_superuser:
+            return Shop.objects.all()
+        return Shop.objects.filter(is_active=True)
+    
+    def perform_create(self, serializer):
+        """
+        При создании магазина суперпользователем:
+        - Если owner не указан, устанавливается текущий пользователь
+        - Магазин активируется
+        """
+        owner = serializer.validated_data.get('owner')
+        if not owner:
+            owner = self.request.user
+        
+        shop = serializer.save(owner=owner, is_active=True)
+        
+        # Если owner не суперпользователь, делаем его staff
+        if not owner.is_staff:
+            owner.is_staff = True
+            owner.save()
+    
+    def perform_update(self, serializer):
+        """
+        При обновлении магазина суперпользователем.
+        """
+        shop = serializer.save()
+        
+        # Если owner не суперпользователь, делаем его staff
+        if shop.owner and not shop.owner.is_staff:
+            shop.owner.is_staff = True
+            shop.owner.save()
 
 
 class AdminAutoLoginView(APIView):

@@ -242,7 +242,6 @@ class ProductVariant(SingleMainMixin):
         related_name="variants",
     )
     # Уникальный артикул
-    # Добавить автогенерацию артикула
     sku = models.CharField(
         "Артикул (SKU)", max_length=50, unique=True, editable=False
     )

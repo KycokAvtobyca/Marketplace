@@ -98,10 +98,6 @@ class CustomUser(
         ordering = ["-date_time_create"]
 
         indexes = [
-            # models.Index(fields=["-date_time_create"], name="user_created_idx"),
-            # Рекомендуется делать поиск сначала по фамилии
-            # из-за объединения создания двух индексов.
-            # Иначе как обычный поиск
             models.Index(
                 fields=["last_name", "name", "middle_name"],
                 name="user_name_idx",

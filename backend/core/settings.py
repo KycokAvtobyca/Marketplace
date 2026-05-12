@@ -107,7 +107,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "marketplace",
+        "NAME": "marketplace2",
         "USER": "postgres",
         "PASSWORD": "Aq27z_D3P",
         "HOST": "127.0.0.1",
@@ -158,12 +158,16 @@ CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
     "http://localhost:3001",
     "http://127.0.0.1:3000",
-    "http://0.0.0.0:8001",
+    "http://127.0.0.1:3001",
+    "http://0.0.0.0:3000",
+    "http://0.0.0.0:3001",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:3000",
+    "http://localhost:3001",
     "http://127.0.0.1:3000",
+    "http://127.0.0.1:3001",
 ]
 
 CORS_ALLOW_CREDENTIALS = True

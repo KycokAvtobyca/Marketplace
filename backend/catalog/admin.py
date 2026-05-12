@@ -205,18 +205,15 @@ class ProductAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
         return ("category", "brand")
 
     def get_fields(self, request, obj=None):
-        """Скрывает поле 'shop' для продавцов, показывает для суперпользователей."""
-        fields = super().get_fields(request, obj)
+        """Показывает поле 'shop' только для суперпользователей."""
+        fields = list(super().get_fields(request, obj))
         if not request.user.is_superuser and "shop" in fields:
             return [f for f in fields if f != "shop"]
         return fields
 
     def get_readonly_fields(self, request, obj=None):
-        """Делает shop readonly для суперпользователей."""
-        readonly = list(super().get_readonly_fields(request, obj))
-        if request.user.is_superuser and "shop" not in readonly:
-            readonly.append("shop")
-        return readonly
+        """Поле shop не readonly для суперпользователей - они должны его редактировать."""
+        return super().get_readonly_fields(request, obj)
 
 
 @admin.register(models.ProductVariant)

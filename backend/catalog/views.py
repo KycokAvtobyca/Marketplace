@@ -6,6 +6,7 @@ from django.db.models import (
     Prefetch,
     Subquery,
     Sum,
+    Q,
 )
 from rest_framework import views, viewsets
 from rest_framework.request import Request
@@ -40,14 +41,12 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             # Тип продукта (в модели поле product_type)
             "product_types": "product_type__slug__in",
             # Атрибуты (Материал, Размер и т.д.)
-            # Мы идем: Product -> variants (related_name) -> attribute_values (поле в ProductVariant) -> id
             "material": "variants__attribute_values__id__in",
             "razmer": "variants__attribute_values__id__in",
         }
 
         # Проходим по всем параметрам в URL
         for param_key in self.request.query_params:
-            # Очищаем ключ от [] (например, 'brands[]' -> 'brands')
             clean_key = param_key.replace("[]", "")
 
             if clean_key in filter_map:
@@ -56,7 +55,16 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                     lookup = filter_map[clean_key]
                     queryset = queryset.filter(**{lookup: values})
 
-        # --- ВАША ЛОГИКА ПОДЗАПРОСОВ ---
+        # --- ПОИСК ПО НАЗВАНИЮ И ОПИСАНИЮ ---
+        search_query = self.request.query_params.get("search", "").strip()
+        if search_query:
+            queryset = queryset.filter(
+                Q(name__icontains=search_query) |
+                Q(description__icontains=search_query) |
+                Q(brand__name__icontains=search_query)
+            )
+
+        # --- ЛОГИКА ПОДЗАПРОСОВ ---
         variants_with_prices = m.ProductVariant.objects.filter(
             product=OuterRef("pk"), is_active=True
         ).with_prices(user=user)
@@ -65,7 +73,7 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             variant__product=OuterRef("pk"), is_main=True
         ).values("image")
 
-        from django.db.models import F, Case, When, IntegerField
+        from django.db.models import Case, When, IntegerField
         
         return (
             queryset.annotate(
@@ -78,7 +86,8 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                 api_image=Subquery(main_image_sq[:1]),
                 api_rating=Avg("variants__reviews__rating"),
                 api_stock=Sum("variants__stock"),
-                # Явное значение для сортировки: товары с наличием = 1, без наличия = 0
+                # Явное значение для сортировки:
+                # товары с наличием = 1, без наличия = 0
                 has_stock=Case(
                     When(api_stock__gt=0, then=1),
                     default=0,
@@ -86,8 +95,8 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                 )
             )
             .select_related("brand", "shop")
-            .distinct()  # Обязательно, так как фильтрация по variants может дублировать продукты
-            .order_by("-has_stock", "-api_stock")  # Товары с наличием в начале, потом по количеству, без наличия в конце
+            .distinct()
+            .order_by("-has_stock", "-api_stock")
         )
 
 

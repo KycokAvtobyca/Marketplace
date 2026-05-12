@@ -103,7 +103,6 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
         decimal_places=2,
         validators=[MinValueValidator(Decimal("0.00"))],
     )
-
     discount = models.ForeignKey(
         "marketing.Discount",
         on_delete=models.PROTECT,
@@ -165,7 +164,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     def get_base_price_for_promocode(self):
         """
         Вычисляет сумму, на которую смотрит промокод.
-        Это сумма ДО вычета самого промокода, но с учетом акций.
+        Это сумма до вычета самого промокода, но с учетом акций.
         """
         base = self.total_cost_without_sales
 

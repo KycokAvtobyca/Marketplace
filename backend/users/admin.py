@@ -82,6 +82,97 @@ class ShopAdmin(ImportExportModelAdmin):
     readonly_fields = ("data_time_create",)
     prepopulated_fields = {"slug": ("name",)}
     list_per_page = 20
+    
+    fieldsets = (
+        ("Основная информация", {
+            "fields": ("name", "slug", "description")
+        }),
+        ("Владелец и статус", {
+            "fields": ("owner", "is_active")
+        }),
+        ("Изображение", {
+            "fields": ("image",)
+        }),
+        ("Дополнительно", {
+            "fields": ("data_time_create",),
+            "classes": ("collapse",)
+        }),
+    )
+    
+    def get_fieldsets(self, request, obj=None):
+        """
+        Суперпользователь может указывать owner при создании магазина.
+        Обычный пользователь видит только свой магазин.
+        """
+        fieldsets = super().get_fieldsets(request, obj)
+        
+        # Если не суперпользователь, скрываем поле owner
+        if not request.user.is_superuser and obj is not None:
+            fieldsets = [
+                (name, opts) for name, opts in fieldsets
+                if name != "Владелец и статус"
+            ]
+            # Добавляем измененный fieldset
+            fieldsets = list(fieldsets) + [
+                ("Статус", {
+                    "fields": ("is_active",)
+                })
+            ]
+        
+        return fieldsets
+    
+    def get_queryset(self, request):
+        """
+        Фильтруем магазины:
+        - Суперпользователь видит все магазины
+        - Обычный пользователь видит только свои магазины
+        """
+        qs = super().get_queryset(request)
+        if not request.user.is_superuser:
+            qs = qs.filter(owner=request.user)
+        return qs
+    
+    def save_model(self, request, obj, form, change):
+        """
+        При создании магазина:
+        - Суперпользователь может выбрать owner
+        - Обычный пользователь автоматически становится owner
+        """
+        if not change:  # Если создаём новый магазин
+            if not request.user.is_superuser:
+                obj.owner = request.user  # Обычный пользователь - его магазин
+            # Суперпользователь может выбрать owner в форме
+        
+        super().save_model(request, obj, form, change)
+    
+    def has_delete_permission(self, request, obj=None):
+        """
+        Суперпользователь может удалять любой магазин.
+        Обычный пользователь может удалять только свой магазин.
+        """
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner == request.user:
+            return True
+        return False
+    
+    def has_change_permission(self, request, obj=None):
+        """
+        Суперпользователь может редактировать любой магазин.
+        Обычный пользователь может редактировать только свой магазин.
+        """
+        if request.user.is_superuser:
+            return True
+        if obj and obj.owner == request.user:
+            return True
+        return False
+    
+    def has_add_permission(self, request):
+        """
+        Только суперпользователи и верифицированные пользователи могут создавать магазины.
+        """
+        # Все пользователи (включая обычных) могут создавать магазины
+        return True
 
 
 @admin.register(SMSCode)

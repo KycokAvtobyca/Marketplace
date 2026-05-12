@@ -42,12 +42,11 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
     def __str__(self):
         return f"Корзина {self.user.phone_number} (ID: {self.pk})"
 
-    # Считать также с точечной скидкой
+    # Считает также с точечной скидкой
     @cached_property
     def total_items_price(self):
         """Считает стоимость всех товаров без учета промокода, но с учетом всех скидок."""
         # Используем генератор, чтобы избежать лишних N+1 запросов,
-        # предполагая, что корзина загружается через prefetch_related('cart_items__product_variant')
         return sum(item.total_price for item in self.cart_items.all())
 
     @cached_property
