@@ -83,6 +83,21 @@ class ShopOwnerAdminMixin:
                 obj.shop = shop
         super().save_model(request, obj, form, change)
 
+    def formfield_for_foreignkey(self, db_field, request, **kwargs):
+        if request.user.is_superuser:
+            return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
+        shop = request.user.shop.first()
+        if shop is not None:
+            if db_field.name == "product":
+                kwargs["queryset"] = models.Product.objects.filter(shop=shop)
+            elif db_field.name in ("variant", "product_variant"):
+                kwargs["queryset"] = models.ProductVariant.objects.filter(
+                    product__shop=shop
+                )
+
+        return super().formfield_for_foreignkey(db_field, request, **kwargs)
+
 
 @admin.register(models.Category)
 class CategoryAdmin(admin.ModelAdmin):
@@ -192,15 +207,15 @@ class ProductAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
     def get_fields(self, request, obj=None):
         """Скрывает поле 'shop' для продавцов, показывает для суперпользователей."""
         fields = super().get_fields(request, obj)
-        if not request.user.is_superuser and 'shop' in fields:
-            return [f for f in fields if f != 'shop']
+        if not request.user.is_superuser and "shop" in fields:
+            return [f for f in fields if f != "shop"]
         return fields
 
     def get_readonly_fields(self, request, obj=None):
         """Делает shop readonly для суперпользователей."""
         readonly = list(super().get_readonly_fields(request, obj))
-        if request.user.is_superuser and 'shop' not in readonly:
-            readonly.append('shop')
+        if request.user.is_superuser and "shop" not in readonly:
+            readonly.append("shop")
         return readonly
 
 

@@ -50,7 +50,7 @@ export default async function RootLayout({
             <div className="max-w-5xl p-3 w-full relative flex flex-col min-h-screen">
               <Header />
               <div className="h-4 sm:h-6" />
-              <main className="grow space-y-5">
+              <main className="grow space-y-5 pb-10">
                 <div className="flex min-[450px]:hidden">
                   <CompactHeader />
                 </div>

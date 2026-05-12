@@ -15,9 +15,12 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 
+from types import MethodType
+
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.auth import login
+from django.contrib.auth import logout as auth_logout
 from django.http import HttpResponseRedirect
 from django.urls import include, path
 from django.views import View
@@ -33,6 +36,21 @@ from core import settings
 # Переопределяем site_url админки на фронтенд
 admin.site.site_url = "http://127.0.0.1:3000/"
 
+original_admin_logout = admin.site.logout
+
+
+def admin_logout(self, request, extra_context=None):
+    if request.method == "POST":
+        auth_logout(request)
+        response = HttpResponseRedirect(settings.LOGOUT_REDIRECT_URL or "/")
+        response.delete_cookie("access_token", path="/")
+        response.delete_cookie("refresh_token", path="/")
+        return response
+    return original_admin_logout(request, extra_context=extra_context)
+
+
+admin.site.logout = MethodType(admin_logout, admin.site)
+
 
 class AdminAutoLoginView(View):
     def get(self, request):
@@ -43,7 +61,11 @@ class AdminAutoLoginView(View):
                 validated_token = auth.get_validated_token(raw_token)
                 user = auth.get_user(validated_token)
                 if user.is_staff or user.is_superuser:
-                    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                    login(
+                        request,
+                        user,
+                        backend="django.contrib.auth.backends.ModelBackend",
+                    )
                     return HttpResponseRedirect("/admin/")
             except Exception:
                 pass

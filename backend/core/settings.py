@@ -86,7 +86,7 @@ ROOT_URLCONF = "core.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": [],
+        "DIRS": [BASE_DIR / "templates"],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -107,7 +107,7 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": "marketplace2",
+        "NAME": "marketplace",
         "USER": "postgres",
         "PASSWORD": "Aq27z_D3P",
         "HOST": "127.0.0.1",
@@ -152,6 +152,7 @@ USE_TZ = True
 
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "static"
+LOGOUT_REDIRECT_URL = "http://127.0.0.1:3000/"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",

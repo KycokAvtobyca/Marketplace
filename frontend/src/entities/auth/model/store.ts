@@ -45,7 +45,12 @@ export const useAuthStore = create<AuthStore>()(
       persist(authStore, {
         name: "auth-storage",
         storage: createJSONStorage(() => localStorage),
-        partialize: (state) => ({ isAuth: state.isAuth }),
+        partialize: (state) => ({ isCodeSent: state.isCodeSent }),
+        onRehydrateStorage: () => (state) => {
+          if (state) {
+            state.isAuth = false
+          }
+        },
       }),
     ),
   ),
