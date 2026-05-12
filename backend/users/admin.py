@@ -37,6 +37,34 @@ class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
 
     readonly_fields = ("date_time_create", "date_time_update", "last_login")
 
+    def get_fieldsets(self, request, obj=None):
+        """Убрать раздел пароля для не-суперпользователей."""
+        fieldsets = super().get_fieldsets(request, obj)
+        
+        # Скрываем пароль если редактируем не-суперпользователя
+        if obj is not None and not obj.is_superuser:
+            fieldsets = [
+                (name, opts) for name, opts in fieldsets
+                if name != 'Password'
+            ]
+        
+        return fieldsets
+
+    def get_form(self, request, obj=None, **kwargs):
+        """Убрать поле пароля из формы для не-суперпользователей."""
+        form = super().get_form(request, obj, **kwargs)
+        
+        # Убираем поле пароля если редактируем не-суперпользователя
+        if obj is not None and not obj.is_superuser:
+            # Удаляем из fields если есть
+            if hasattr(form, 'fields') and 'password' in form.fields:
+                del form.fields['password']
+            # Также удаляем из base_fields для инстанце проверок
+            if hasattr(form, 'base_fields') and 'password' in form.base_fields:
+                form.base_fields = {k: v for k, v in form.base_fields.items() if k != 'password'}
+        
+        return form
+
 
 @admin.register(Shop)
 class ShopAdmin(ImportExportModelAdmin):

@@ -17,16 +17,41 @@ Including another URLconf
 
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.auth import login
+from django.http import HttpResponseRedirect
 from django.urls import include, path
+from django.views import View
 from drf_spectacular.views import (
     SpectacularAPIView,
     SpectacularRedocView,
     SpectacularSwaggerView,
 )
+from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from core import settings
 
+# Переопределяем site_url админки на фронтенд
+admin.site.site_url = "http://127.0.0.1:3000/"
+
+
+class AdminAutoLoginView(View):
+    def get(self, request):
+        auth = JWTAuthentication()
+        raw_token = request.COOKIES.get("access_token")
+        if raw_token:
+            try:
+                validated_token = auth.get_validated_token(raw_token)
+                user = auth.get_user(validated_token)
+                if user.is_staff or user.is_superuser:
+                    login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+                    return HttpResponseRedirect("/admin/")
+            except Exception:
+                pass
+        return HttpResponseRedirect("/admin/login/?next=/admin/")
+
+
 urlpatterns = [
+    path("admin-login/", AdminAutoLoginView.as_view(), name="admin-auto-login"),
     path("admin/", admin.site.urls),
     path("api/v1/", include("api.urls")),
     # Путь для скачивания самого файла схемы (yaml/json)

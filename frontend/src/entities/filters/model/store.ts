@@ -3,13 +3,22 @@ import { create, StateCreator } from "zustand"
 import { devtools } from "zustand/middleware"
 import { immer } from "zustand/middleware/immer"
 
+// Тип для хранения выбранных фильтров
+// Пример: { brands: ['nike', 'adidas'], category: ['obuv'] }
+type FilterValue = string | number
+
 interface IActions {
   toggleFilterModalMenu: () => void
   setIsFilterModalMenu: (isFilterModalMenu: boolean) => void
+  toggleFilter: (filterId: string) => void
+  resetFilters: () => void
+  setAppliedQueryString: (query: string) => void
 }
 
 interface IInitialState {
   isFilterModalMenu: boolean
+  selectedFilters: FilterValue[]
+  appliedQueryString: string
 }
 
 interface FilterModalMenuStore extends IActions, IInitialState {}
@@ -21,6 +30,8 @@ type FilterModalMenuStoreCreator = StateCreator<
 
 const initialState: IInitialState = {
   isFilterModalMenu: false,
+  selectedFilters: [],
+  appliedQueryString: "",
 }
 
 const filterModalMenuStore: FilterModalMenuStoreCreator = (set) => ({
@@ -40,6 +51,39 @@ const filterModalMenuStore: FilterModalMenuStoreCreator = (set) => ({
       "isFilterModalMenu",
       isFilterModalMenu,
       "filterMenuModal/setIsFilterModalMenu",
+    )
+  },
+  toggleFilter: (filterId) => {
+    set(
+      (state) => {
+        const index = state.selectedFilters.indexOf(filterId)
+        if (index === -1) {
+          state.selectedFilters.push(filterId) // Если нет - добавляем
+        } else {
+          state.selectedFilters.splice(index, 1) // Если есть - удаляем
+        }
+      },
+      false,
+      "filterMenuModal/toggleFilter",
+    )
+  },
+  setAppliedQueryString: (query) => {
+    set(
+      (s) => {
+        s.appliedQueryString = query
+      },
+      false,
+      "filter/setAppliedQuery",
+    )
+  },
+  resetFilters: () => {
+    set(
+      (state) => {
+        state.selectedFilters = []
+        state.appliedQueryString = ""
+      },
+      false,
+      "filterMenuModal/resetFilters",
     )
   },
 })

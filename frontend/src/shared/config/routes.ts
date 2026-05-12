@@ -150,6 +150,7 @@ const USER_APP_ROUTES = {
     TOKEN: "auth/token/",
     TOKEN_REFRESH: "auth/token/refresh/",
     TOKEN_VERIFY: "auth/token/verify/",
+    LOGOUT: "auth/logout/",
   },
 
   SHOP: {
@@ -161,12 +162,17 @@ const USER_APP_ROUTES = {
     ROOT: "profile/",
     EXIT: "profile/exit/",
   },
+
+  PHONE_CHANGE: "profile/phone-change/",
+  SHOP_CREATE: "shop/create/",
+  MY_SHOP: "shop/my/",
 }
 
 const CART_BASE_URL = BASE_URL + "cart/"
 
 const CART_APP_ROUTES = {
-  GET_CONTENTS: "get_cart_contents/",
+  ROOT: "",
+  GET_CONTENTS: "get_contents/",
   ADD_ITEM: "add_item/",
   UPDATE_ITEM: "update_item/",
   REMOVE_ITEM: "remove_item/",
@@ -176,6 +182,7 @@ const CART_APP_ROUTES = {
 const FAVORITES_BASE_URL = BASE_URL + "favorites/"
 
 const FAVORITES_APP_ROUTES = {
+  ROOT: "",
   GET_FAVORITES: "get_favorites/",
   ADD_ITEM: "add_item/",
   REMOVE_ITEM: "remove_item/",
@@ -189,4 +196,9 @@ export const ROUTES = {
   ...withPrefix(USER_BASE_URL, USER_APP_ROUTES),
   CART: { ...withPrefix(CART_BASE_URL, CART_APP_ROUTES) },
   FAVORITES: { ...withPrefix(FAVORITES_BASE_URL, FAVORITES_APP_ROUTES) },
+
+  ORDERS: {
+    ROOT: BASE_URL + "orders/",
+    CREATE: BASE_URL + "orders/create/",
+  },
 } as const

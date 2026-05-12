@@ -114,6 +114,7 @@ class ProductTypeSerializer(serializers.ModelSerializer):
 
 class ProductVariantSerializer(serializers.ModelSerializer):
     attribute_values = AttributeValuesSerializer(read_only=True, many=True)
+    images = serializers.SerializerMethodField()
 
     # Эти поля будут браться из аннотаций QuerySet или из @property модели
     final_price = serializers.DecimalField(
@@ -128,6 +129,22 @@ class ProductVariantSerializer(serializers.ModelSerializer):
         model = ProductVariant
         exclude = ["price"]
 
+    def get_images(self, obj):
+        request = self.context.get("request")
+        images = obj.images.all().order_by("-is_main", "pk")
+        return [
+            {
+                "id": img.id,
+                "image": (
+                    request.build_absolute_uri(img.image.url)
+                    if request
+                    else img.image.url
+                ),
+                "is_main": img.is_main,
+            }
+            for img in images
+        ]
+
 
 class ProductCatalogSerializer(serializers.ModelSerializer):
     # Указываем source, чтобы DRF знал, из какого аннотированного поля брать данные
@@ -140,6 +157,7 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     rating = serializers.FloatField(source="api_rating")
     stock = serializers.IntegerField(source="api_stock")
+    variant_id = serializers.SerializerMethodField()
 
     def get_image(self, obj):
         # obj.api_image содержит строку, например "products/2026/05/10/photo.jpg"
@@ -152,6 +170,11 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
             return image_url
         return None
 
+    def get_variant_id(self, obj):
+        # Получаем первый активный вариант товара
+        variant = obj.variants.filter(is_active=True).first()
+        return variant.id if variant else None
+
     class Meta:
         model = Product
         fields = [
@@ -162,6 +185,7 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
             "image",
             "rating",
             "stock",
+            "variant_id",
         ]
 
 
@@ -204,7 +228,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
         if variants_flag:
             return ProductVariantSerializer(
-                obj.variants.all(), read_only=True, many=True
+                obj.variants.all(), read_only=True, many=True, context=self.context
             ).data
         return []
 

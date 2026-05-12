@@ -21,45 +21,73 @@ from .utils import get_limited_data, prefetch_tree_data
 
 
 class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
-    # Используем легкий сериализатор
     serializer_class = s.ProductCatalogSerializer
     pagination_class = DefaultCursorPagination
 
     def get_queryset(self):
         user = self.request.user
+        queryset = m.Product.objects.filter(shop__is_active=True)
 
-        # 1. Готовим запрос вариантов С УЧЕТОМ скидок (используем ваш метод)
-        # Мы фильтруем по OuterRef("pk"), чтобы привязать варианты к конкретному товару
+        # --- ДИНАМИЧЕСКАЯ ФИЛЬТРАЦИЯ ---
+        filter_map = {
+            # Категории (odezhda, obuv и т.д. на фронте приходят как отдельные ключи)
+            "categories": "category__slug__in",
+            "odezhda": "category__slug__in",
+            "obuv": "category__slug__in",
+            # Бренды и Магазины
+            "brands": "brand__slug__in",
+            "shops": "shop__slug__in",
+            # Тип продукта (в модели поле product_type)
+            "product_types": "product_type__slug__in",
+            # Атрибуты (Материал, Размер и т.д.)
+            # Мы идем: Product -> variants (related_name) -> attribute_values (поле в ProductVariant) -> id
+            "material": "variants__attribute_values__id__in",
+            "razmer": "variants__attribute_values__id__in",
+        }
+
+        # Проходим по всем параметрам в URL
+        for param_key in self.request.query_params:
+            # Очищаем ключ от [] (например, 'brands[]' -> 'brands')
+            clean_key = param_key.replace("[]", "")
+
+            if clean_key in filter_map:
+                values = self.request.query_params.getlist(param_key)
+                if values:
+                    lookup = filter_map[clean_key]
+                    queryset = queryset.filter(**{lookup: values})
+
+        # --- ВАША ЛОГИКА ПОДЗАПРОСОВ ---
         variants_with_prices = m.ProductVariant.objects.filter(
             product=OuterRef("pk"), is_active=True
         ).with_prices(user=user)
 
-        # 2. Подзапрос для картинки (как и был)
         main_image_sq = m.ProductImage.objects.filter(
             variant__product=OuterRef("pk"), is_main=True
         ).values("image")
 
+        from django.db.models import F, Case, When, IntegerField
+        
         return (
-            m.Product.objects.filter(shop__is_active=True)
-            .annotate(
-                # Минимальная цена: берем из подзапроса с аннотированными ценами
-                # Сортируем по вычисленной цене и берем первое значение
+            queryset.annotate(
                 api_price=Subquery(
                     variants_with_prices.order_by("discounted_price").values(
                         "discounted_price"
                     )[:1]
                 ),
-                # Старая цена (базовая)
                 api_old_price=Min("variants__price"),
-                # Картинка
                 api_image=Subquery(main_image_sq[:1]),
-                # Средний рейтинг (лучше считать напрямую через связь)
                 api_rating=Avg("variants__reviews__rating"),
-                # Суммарный остаток (ОБЯЗАТЕЛЬНО Sum вместо Count)
                 api_stock=Sum("variants__stock"),
+                # Явное значение для сортировки: товары с наличием = 1, без наличия = 0
+                has_stock=Case(
+                    When(api_stock__gt=0, then=1),
+                    default=0,
+                    output_field=IntegerField()
+                )
             )
             .select_related("brand", "shop")
-            .distinct()
+            .distinct()  # Обязательно, так как фильтрация по variants может дублировать продукты
+            .order_by("-has_stock", "-api_stock")  # Товары с наличием в начале, потом по количеству, без наличия в конце
         )
 
 

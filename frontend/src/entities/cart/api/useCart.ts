@@ -88,18 +88,55 @@ export const useGetCart = () => {
       const response = await api.get<CartResponse>(ROUTES.CART.GET_CONTENTS)
       return response.data
     },
+    retry: false,
   })
 }
 
 export const useRemoveFromCart = () => {
   return useMutation({
-    mutationFn: async (cartItemId: number): Promise<CartApiAction> => {
+    // Изменяем аргумент на объект, чтобы он совпадал с handleRemove
+    mutationFn: async ({
+      cart_item_id,
+    }: {
+      cart_item_id: number
+    }): Promise<CartApiAction> => {
       try {
         const response = await api.delete<{
           message: string
           cart: CartResponse
         }>(ROUTES.CART.REMOVE_ITEM, {
-          data: { cart_item_id: cartItemId },
+          // Axios требует, чтобы тело DELETE запроса передавалось в ключе data
+          data: { cart_item_id },
+        })
+
+        return {
+          success: true,
+          data: response.data.cart,
+        }
+      } catch (error) {
+        // ... твой код обработки ошибок остается таким же ...
+        return { success: false, error: { data: { detail: "Ошибка" } } }
+      }
+    },
+  })
+}
+
+export const useUpdateCartItemQuantity = () => {
+  return useMutation({
+    mutationFn: async ({
+      cart_item_id,
+      quantity,
+    }: {
+      cart_item_id: number
+      quantity: number
+    }): Promise<CartApiAction> => {
+      try {
+        const response = await api.patch<{
+          message: string
+          cart: CartResponse
+        }>(ROUTES.CART.UPDATE_ITEM, {
+          cart_item_id,
+          quantity,
         })
 
         return {
@@ -123,7 +160,7 @@ export const useRemoveFromCart = () => {
           success: false,
           error: {
             data: {
-              detail: "Произошла ошибка при удалении из корзины",
+              detail: "Не удалось обновить количество",
             },
           },
         }

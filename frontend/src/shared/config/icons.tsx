@@ -5,6 +5,10 @@ import Search from "@/shared/assets/icons/search-white.svg"
 import Auth from "@/shared/assets/icons/login-brand.svg"
 import HamburgerMenu from "@/shared/assets/icons/hamburger-menu-brand.svg"
 import ArrowDownWithoutLine from "@/shared/assets/icons/arrow-without-line-down-brand.svg"
+import HeartBrand from "@/shared/assets/icons/heart-brand.svg"
+import HeartGray from "@/shared/assets/icons/heart-gray.svg"
+import Cart from "@/shared/assets/icons/cart-brand.svg"
+import Trash from "@/shared/assets/icons/trash-brand.svg"
 import clsx from "clsx"
 
 export const ICON_REGISTRY = {
@@ -24,6 +28,10 @@ export const ICON_REGISTRY = {
   CLOSE: Close,
   SEARCH: Search,
   HAMBURGERMENU: HamburgerMenu,
+  HEARTBRAND: HeartBrand,
+  HEARTGRAY: HeartGray,
+  CART: Cart,
+  TRASH: Trash,
 }
 
 const setSize = (width: number, height: number, viewBox: number) => {
@@ -44,6 +52,10 @@ export const ICON_SIZES = {
   CLOSE: setSize(20, 20, 24),
   SEARCH: setSize(30, 30, 24),
   HAMBURGERMENU: setSize(40, 40, 24),
+  HEARTBRAND: setSize(30, 30, 24),
+  HEARTGRAY: setSize(30, 30, 24),
+  CART: setSize(30, 30, 24),
+  TRASH: setSize(30, 30, 24),
 } as const
 
 export type IconName = keyof typeof ICON_REGISTRY

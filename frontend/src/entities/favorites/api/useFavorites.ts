@@ -87,6 +87,10 @@ export const useGetFavorites = () => {
       )
       return response.data
     },
+    retry: 1,
+    retryDelay: 500,
+    staleTime: 1000 * 60 * 5, // 5 минут
+    refetchOnWindowFocus: true,
   })
 }
 

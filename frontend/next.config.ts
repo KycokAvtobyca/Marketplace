@@ -18,7 +18,11 @@ const nextConfig: NextConfig = {
   //   appIsrStatus: true,
   // },
 
-  // allowedDevOrigins: ["192.168.137.68"],
+  allowedDevOrigins: [
+    "http://127.0.0.1:3000",
+    "http://localhost:3000",
+    "http://0.0.0.0:3000",
+  ],
 }
 // Временно используем any, так как типы в 16.1.7 могут отставать от движка
 

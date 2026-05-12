@@ -64,6 +64,11 @@ INSTALLED_APPS = [
 
 AUTH_USER_MODEL = "users.CustomUser"
 
+AUTHENTICATION_BACKENDS = [
+    "core.admin_auth.JWTAdminAuthBackend",  # JWT аутентификация для админки
+    "django.contrib.auth.backends.ModelBackend",  # Стандартный бэкенд
+]
+
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "corsheaders.middleware.CorsMiddleware",
@@ -155,6 +160,11 @@ CORS_ALLOWED_ORIGINS = [
     "http://0.0.0.0:8001",
 ]
 
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+]
+
 CORS_ALLOW_CREDENTIALS = True
 
 MEDIA_URL = "/media/"
@@ -169,6 +179,7 @@ REST_FRAMEWORK = {
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "api.authentication.HttpOnlyJWTAuthentication",
+        "rest_framework.authentication.SessionAuthentication",  # Для Browsable API
     ),
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
@@ -297,4 +308,38 @@ ADMIN_INTERFACE = {
     "ADMIN_TIME_FORMAT": "H:i",
     "ADMIN_ALLOW_THEME_EDIT": True,
     "ADMIN_EXTRA_BUTTONS": [],
+}
+
+DEBUG_TOOLBAR_PANELS = [
+    "debug_toolbar.panels.history.HistoryPanel",
+    "debug_toolbar.panels.versions.VersionsPanel",
+    "debug_toolbar.panels.timer.TimerPanel",
+    "debug_toolbar.panels.settings.SettingsPanel",
+    "debug_toolbar.panels.headers.HeadersPanel",
+    "debug_toolbar.panels.request.RequestPanel",
+    "debug_toolbar.panels.sql.SQLPanel",
+    "debug_toolbar.panels.staticfiles.StaticFilesPanel",
+    "debug_toolbar.panels.templates.TemplatesPanel",
+    "debug_toolbar.panels.cache.CachePanel",
+    "debug_toolbar.panels.signals.SignalsPanel",
+    "debug_toolbar.panels.logging.LoggingPanel",
+    "debug_toolbar.panels.redirects.RedirectsPanel",
+    # 'debug_toolbar.panels.profiling.ProfilingPanel', # ЗАКОММЕНТИРУЙ ЭТУ СТРОКУ
+]
+
+
+def show_toolbar(request):
+    # Не показывать тулбар для медиа и если IP не в белом списке
+    if request.path.startswith("/media/"):
+        return False
+    from django.conf import settings
+
+    return (
+        settings.DEBUG
+        and request.META.get("REMOTE_ADDR") in settings.INTERNAL_IPS
+    )
+
+
+DEBUG_TOOLBAR_CONFIG = {
+    "SHOW_TOOLBAR_CALLBACK": show_toolbar,
 }

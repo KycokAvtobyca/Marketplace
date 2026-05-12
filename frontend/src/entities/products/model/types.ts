@@ -5,7 +5,8 @@ export interface Product {
   old_price: string
   image: string
   rating: number | null
-  stock: number
+  stock: number | null
+  variant_id: number | null
 }
 
 export interface ProductCatalogResponse {

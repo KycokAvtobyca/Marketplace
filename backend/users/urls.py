@@ -1,11 +1,21 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 from rest_framework_simplejwt.views import (
-    TokenRefreshView,
     TokenVerifyView,
 )
 
-from .views import HybridTokenObtainView, ProfileView, SendSMSView, ShopViewSet
+from .views import (
+    AdminAutoLoginView,
+    CreateShopView,
+    HttpOnlyTokenRefreshView,
+    HybridTokenObtainView,
+    LogoutView,
+    MyShopView,
+    PhoneChangeView,
+    ProfileView,
+    SendSMSView,
+    ShopViewSet,
+)
 
 router = DefaultRouter()
 router.register("shop", ShopViewSet)
@@ -16,9 +26,16 @@ urlpatterns = [
         "auth/token/", HybridTokenObtainView.as_view(), name="token_obtain_pair"
     ),
     path(
-        "auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"
+        "auth/token/refresh/",
+        HttpOnlyTokenRefreshView.as_view(),
+        name="token_refresh",
     ),
     path("auth/token/verify/", TokenVerifyView.as_view(), name="token_verify"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("profile/", ProfileView.as_view(), name="profile"),
+    path("profile/phone-change/", PhoneChangeView.as_view(), name="phone_change"),
+    path("shop/create/", CreateShopView.as_view(), name="shop_create"),
+    path("shop/my/", MyShopView.as_view(), name="my_shop"),
+    path("admin-login/", AdminAutoLoginView.as_view(), name="admin_login"),
     path("", include(router.urls)),
 ]

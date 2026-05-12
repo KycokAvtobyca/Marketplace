@@ -13,8 +13,6 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-        # if "username" in self.fields:
-        #     del self.fields["username"]
         self.fields["password"].required = False
 
     def validate(self, attrs):
@@ -60,7 +58,58 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
         }
 
 
+class UserSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = (
+            "id",
+            "phone_number",
+            "name",
+            "last_name",
+            "middle_name",
+            "email",
+            "address",
+            "address_data",
+            "is_active",
+            "is_staff",
+            "date_time_create",
+            "date_time_update",
+        )
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CustomUser
+        fields = (
+            "name",
+            "last_name",
+            "middle_name",
+            "email",
+            "address",
+            "address_data",
+        )
+
+
+class PhoneChangeSerializer(serializers.Serializer):
+    action = serializers.ChoiceField(
+        choices=[
+            "send_old",
+            "verify_old",
+            "send_new",
+            "verify_new",
+        ]
+    )
+    new_phone = serializers.CharField(required=False, allow_blank=True)
+    code = serializers.CharField(required=False, allow_blank=True)
+
+
 class ShopSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         exclude = ["id"]
+
+
+class ShopCreateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Shop
+        fields = ["name", "description", "image"]

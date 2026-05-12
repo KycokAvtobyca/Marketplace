@@ -1,5 +1,9 @@
 import { Accordion } from "@/shared/ui/Accordion"
-import { BaseProperties, FilterItem } from "@/entities/filters"
+import {
+  BaseProperties,
+  FilterItem,
+  useFilterModalMenuStore,
+} from "@/entities/filters"
 import clsx from "clsx"
 import { CheckBox } from "@/shared/ui/CheckBox"
 
@@ -22,22 +26,39 @@ const hasChildren = (obj: any): boolean => {
   return getChildrenArray(obj).length > 0
 }
 
-const contentWithoutChildren = (object: BaseProperties, path?: string) => {
-  const fullName = path ? `${path}__${object.slug}` : object.slug
+// Написать onchange для чекбокса, который будет обновлять состояние выбранных фильтров в родительском компоненте (например, через контекст или пропсы).
+// Это позволит сохранять выбранные фильтры при открытии/закрытии аккордеона и при навигации по сайту.
+
+const FilterLeaf = ({ object, path }: { object: any; path?: string }) => {
+  const toggleFilter = useFilterModalMenuStore((s) => s.toggleFilter)
+
+  // Достаем slug или id (так как у атрибутов в JSON используется id)
+  const itemValue = object.slug || object.id?.toString()
+  const fullName = path ? `${path}__${itemValue}` : itemValue
+
+  // Проверяем, выбран ли текущий чекбокс
+  const isChecked = useFilterModalMenuStore((s) =>
+    s.selectedFilters.includes(fullName),
+  )
+
+  const handleChange = () => {
+    toggleFilter(fullName)
+  }
 
   return (
     <div className="py-0.5">
-      {" "}
-      {/* Минимум отступов между чекбоксами */}
       <CheckBox
         name={fullName}
-        className="text-xs sm:text-sm py-1" // Убедись, что в компоненте CheckBox можно передать размер
+        checked={isChecked} // Связываем со стором
+        onChange={handleChange} // Обработчик клика
+        className="text-xs sm:text-sm py-1"
       >
         {object.name}
       </CheckBox>
     </div>
   )
 }
+
 interface FilterListProps {
   object?: FilterItem
   title?: string
@@ -52,30 +73,34 @@ export const FilterList: React.FC<FilterListProps> = ({
   title,
   object,
   isSidebar = false,
-  hasParent = false, // ДОБАВИЛИ СЮДА
+  hasParent = false,
 }) => {
   if (!object) return null
 
   const children = getChildrenArray(object)
+  // Используем slug, если нет - id, как корень для текущего уровня
   const currentPath = object.slug
 
   const renderContent = () => {
-    return children.map((child: FilterItem, idx: number) => {
+    return children.map((child: any, idx: number) => {
       if (hasChildren(child)) {
         return (
           <FilterList
-            key={child.slug || idx}
+            key={child.slug || child.id || idx}
             object={child}
             isSidebar={isSidebar}
-            hasParent={true} // ПЕРЕДАЕМ ТУТ, чтобы дочерние знали, что они не корень
+            hasParent={true}
           />
         )
       }
 
+      // Используем новый компонент вместо вызова функции
       return (
-        <div key={child.slug || idx} className="py-0.5">
-          {contentWithoutChildren(child, currentPath)}
-        </div>
+        <FilterLeaf
+          key={child.slug || child.id || idx}
+          object={child}
+          path={currentPath}
+        />
       )
     })
   }
@@ -91,7 +116,7 @@ export const FilterList: React.FC<FilterListProps> = ({
         ]}
         classNameAccordionItemOuterDiv={clsx(
           "bg-transparent",
-          hasParent ? "mt-0" : "mt-1", // ТЕПЕРЬ ОШИБКИ НЕ БУДЕТ
+          hasParent ? "mt-0" : "mt-1",
         )}
       />
     </div>

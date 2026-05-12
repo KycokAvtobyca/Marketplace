@@ -1,29 +1,37 @@
 "use client"
 
-import { useAuthStore } from "@/entities/auth/model/store"
 import { useAuthWindowStore } from "@/entities/authWindow/"
 import { Popover } from "@/shared/ui/Popover"
 import { Icon } from "@/shared/ui/Icons/Icon"
 import { useRef, useState } from "react"
-import { useShallow } from "zustand/shallow"
 import Link from "next/link"
 import dynamic from "next/dynamic"
 import { ROUTES } from "@/shared/config/routes"
 import styles from "./UserButton.module.scss"
+import { useProfile } from "@/entities/user/api/useProfile"
+import { useLogout } from "@/entities/auth/api/useLogout"
+import { useAuthStore } from "@/entities/auth"
 
 export const UserButtonBase = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const toggleAuthWindow = useAuthWindowStore((s) => s.toggle)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const { isAuth } = useAuthStore(
-    useShallow((state) => ({
-      isAuth: state.isAuth,
-    })),
-  )
+  const { data: profile, isError, isLoading } = useProfile()
+  const { mutate: logout, isPending: isLoggingOut } = useLogout()
+  const authStoreIsAuth = useAuthStore((s) => s.isAuth)
+
+  // isAuth определяем по профилю ИЛИ по стору авторизации,
+  // чтобы интерфейс сразу реагировал на вход
+  const isAuth = (!!profile && !isError) || authStoreIsAuth
+
+  const handleLogout = () => {
+    logout()
+    setIsMenuOpen(false)
+  }
 
   return (
-    <div className="flex items-center gap-4 shrink-0">
+    <div className="flex items-center gap-4 shrink-0 pl-1">
       {isAuth ? (
         <>
           <button
@@ -40,15 +48,16 @@ export const UserButtonBase = () => {
             onClose={() => setIsMenuOpen(false)}
           >
             <div className={styles.divP}>
-              <Link href={ROUTES.PROFILE.ROOT}>
+              <Link href="/profile">
                 <p>Личный кабинет</p>
               </Link>
-              {/* <Link href={ROUTES.ORDERS}>
-                <p>Заказы</p>
-              </Link> */}
-              <Link href={ROUTES.PROFILE.EXIT}>
-                <p>Выйти</p>
-              </Link>
+              <button
+                onClick={handleLogout}
+                disabled={isLoggingOut}
+                className="w-full text-left text-red-500 hover:opacity-70 transition-opacity disabled:opacity-50"
+              >
+                {isLoggingOut ? "Выход..." : "Выйти"}
+              </button>
             </div>
           </Popover>
         </>

@@ -31,5 +31,13 @@ class FilterValuesPagination(CursorPagination):
 class DefaultCursorPagination(CursorPagination):
     page_size = api_settings.PAGE_SIZE
     cursor_query_param = "cursor"
-    ordering = "-id"
+    ordering = ("-date_time_create", "-id")
+    template = None
+
+
+class DefaultOrderPagination(CursorPagination):
+    """Pagination класс для заказов."""
+    page_size = api_settings.PAGE_SIZE
+    cursor_query_param = "cursor"
+    ordering = "-date_time_create"  # Новые заказы в начале
     template = None

@@ -1,16 +1,19 @@
-import { useMutation } from "@tanstack/react-query"
+import { useMutation, useQueryClient } from "@tanstack/react-query"
 import {
   ErrorResponseAuthData,
   RequestAuthData,
   useAuthStore,
   AuthApiAction,
 } from "@/entities/auth"
+import { useAuthWindowStore } from "@/entities/authWindow"
 import { api } from "@/shared/api"
 import { isAxiosError } from "axios"
 import { ROUTES } from "@/shared/config"
 
 export const useAuth = () => {
   const setIsAuth = useAuthStore((s) => s.setIsAuth)
+  const queryClient = useQueryClient()
+  const setAuthWindowOpen = useAuthWindowStore((s) => s.setIsOpen)
 
   return useMutation({
     mutationFn: async ({
@@ -53,9 +56,15 @@ export const useAuth = () => {
         }
       }
     },
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.success) {
         setIsAuth(true)
+        // Сразу перезапрашиваем данные профиля и избранного,
+        // чтобы интерфейс мгновенно переключился на авторизованный режим
+        await queryClient.refetchQueries({ queryKey: ["profile"], exact: true })
+        await queryClient.refetchQueries({ queryKey: ["favorites"], exact: true })
+        // Закрываем окно авторизации
+        setAuthWindowOpen(false)
       }
     },
   })
