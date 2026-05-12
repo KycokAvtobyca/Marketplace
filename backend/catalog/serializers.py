@@ -157,6 +157,8 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
     image = serializers.SerializerMethodField()
     rating = serializers.FloatField(source="api_rating")
     stock = serializers.IntegerField(source="api_stock")
+    sku = serializers.SerializerMethodField()
+    description = serializers.CharField(read_only=True)
     variant_id = serializers.SerializerMethodField()
 
     def get_image(self, obj):
@@ -170,6 +172,14 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
             return image_url
         return None
 
+    def get_sku(self, obj):
+        variant = (
+            obj.variants.filter(is_active=True)
+            .order_by("-is_main", "pk")
+            .first()
+        )
+        return variant.sku if variant else None
+
     def get_variant_id(self, obj):
         # Получаем первый активный вариант товара
         variant = obj.variants.filter(is_active=True).first()
@@ -180,11 +190,13 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "description",
             "price",
             "old_price",
             "image",
             "rating",
             "stock",
+            "sku",
             "variant_id",
         ]
 
@@ -228,7 +240,10 @@ class ProductSerializer(serializers.ModelSerializer):
 
         if variants_flag:
             return ProductVariantSerializer(
-                obj.variants.all(), read_only=True, many=True, context=self.context
+                obj.variants.all(),
+                read_only=True,
+                many=True,
+                context=self.context,
             ).data
         return []
 

@@ -4,6 +4,7 @@ import { SearchForm } from "@/features/SearchProducts"
 import { UserButton } from "@/features/Auth"
 import { FavoritesButton } from "@/features/FavoritesButton/FavoritesButton"
 import { CartButton } from "@/features/CartButton/CartButton"
+import { CatalogMenu } from "@/widgets/Header/ui/CatalogMenu"
 
 export const CompactHeader = () => {
   return (
@@ -11,6 +12,10 @@ export const CompactHeader = () => {
       {/* Поиск (занимает основную часть) */}
       <div className="flex-1 h-full">
         <SearchForm />
+      </div>
+
+      <div className="flex items-center gap-2">
+        <CatalogMenu compact />
       </div>
 
       {/* Иконки */}

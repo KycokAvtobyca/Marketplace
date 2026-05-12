@@ -18,7 +18,7 @@ export const useFilterProperties = (vars: FilterVariables) => {
 }
 
 export const useCategories = (vars: FilterVariables) => {
-  return useBaseFilter<CategoriesResponse>({
+  return useBaseFilter<{ categories: CategoriesResponse }>({
     fetcher: (vars) => api.get(ROUTES.FILTERS.CATEGORIES(vars.cursor)),
     key: "categories",
     variables: vars,

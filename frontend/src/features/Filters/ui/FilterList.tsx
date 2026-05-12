@@ -74,12 +74,13 @@ export const FilterList: React.FC<FilterListProps> = ({
   object,
   isSidebar = false,
   hasParent = false,
+  parentPath,
 }) => {
   if (!object) return null
 
   const children = getChildrenArray(object)
-  // Используем slug, если нет - id, как корень для текущего уровня
-  const currentPath = object.slug
+  // Храним корневой путь группы фильтров (например: categories, product_types, material)
+  const currentPath = parentPath || object.slug
 
   const renderContent = () => {
     return children.map((child: any, idx: number) => {
@@ -90,6 +91,7 @@ export const FilterList: React.FC<FilterListProps> = ({
             object={child}
             isSidebar={isSidebar}
             hasParent={true}
+            parentPath={currentPath}
           />
         )
       }

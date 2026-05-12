@@ -1,5 +1,7 @@
 "use client"
 
+import { useMemo } from "react"
+import { useSearchParams } from "next/navigation"
 import { ProductCard, ProductCardSkeleton } from "@/entities/products"
 import { ProductCatalogResponse } from "@/entities/products/model/types"
 import { useCatalogProducts } from "@/entities/products"
@@ -11,10 +13,34 @@ export const ProductList = () => {
   const appliedQueryString = useFilterModalMenuStore(
     (s) => s.appliedQueryString,
   )
+  const searchParams = useSearchParams()
+  const search = searchParams?.get("search")?.trim() || ""
+  const category =
+    searchParams?.get("categories")?.trim() ||
+    searchParams?.get("category")?.trim() ||
+    ""
+
+  const queryString = useMemo(() => {
+    const params = new URLSearchParams(appliedQueryString)
+    if (search) {
+      params.set("search", search)
+    } else {
+      params.delete("search")
+    }
+
+    // Добавляем категорию из URL
+    if (category) {
+      params.set("categories", category)
+    } else {
+      params.delete("categories")
+    }
+
+    return params.toString()
+  }, [appliedQueryString, search, category])
 
   // Используем ваш хук.
-  // Как только appliedQueryString изменится, React Query сделает новый запрос.
-  const { data, isLoading, isError } = useCatalogProducts(appliedQueryString)
+  // Как только appliedQueryString или search изменятся, React Query сделает новый запрос.
+  const { data, isLoading, isError } = useCatalogProducts(queryString)
 
   // const { data, isLoading, isError } = useQuery({
   //   queryKey: ["products"],

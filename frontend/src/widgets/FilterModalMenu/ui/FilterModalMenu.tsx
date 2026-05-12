@@ -1,13 +1,13 @@
 "use client"
 
+import React, { useState } from "react"
 import { useFilterModalMenuStore } from "@/entities/filters"
 import { HamburgerButton } from "@/shared/ui/HamburgerButton"
 import { ModalMenu } from "@/shared/ui/ModalMenu"
 import { FilterGroupList } from "@/features/Filters/"
+import { PriceRangeFilter } from "@/features/Filters/ui/PriceRangeFilter"
 import clsx from "clsx"
-import { api } from "@/shared/api"
 import { getApiParams } from "@/shared/lib/getApiParams/getApiParams"
-import { ROUTES } from "@/shared/config"
 
 interface FilterModalMenuProps {
   classNameHamburgerButton?: string
@@ -26,7 +26,17 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
     setAppliedQueryString,
   } = useFilterModalMenuStore()
 
-  const hasFilters = selectedFilters.length > 0
+  const [priceMin, setPriceMin] = useState("")
+  const [priceMax, setPriceMax] = useState("")
+
+  const handleResetFilters = () => {
+    resetFilters()
+    setPriceMin("")
+    setPriceMax("")
+    setAppliedQueryString("")
+  }
+
+  const hasFilters = selectedFilters.length > 0 || priceMin || priceMax
 
   const handleApply = () => {
     const params = getApiParams(selectedFilters)
@@ -37,6 +47,13 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
         values.forEach((val) => searchParams.append(key, val))
       }
     })
+
+    if (priceMin) {
+      searchParams.set("price_min", priceMin)
+    }
+    if (priceMax) {
+      searchParams.set("price_max", priceMax)
+    }
 
     setAppliedQueryString(searchParams.toString())
     toggleFilterModalMenu()
@@ -59,7 +76,7 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
           <div className="flex items-center justify-between mb-6 px-1 shrink-0">
             <h2 className="text-2xl font-bold text-slate-800">Фильтры</h2>
             <button
-              onClick={resetFilters}
+              onClick={handleResetFilters}
               className={clsx(
                 "text-sm font-bold text-brand-main transition-all uppercase tracking-tight",
                 hasFilters ? "opacity-100" : "opacity-0 pointer-events-none",
@@ -71,6 +88,12 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
 
           {/* 2. Список (С прокруткой) */}
           <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar">
+            <PriceRangeFilter
+              onChange={(min, max) => {
+                setPriceMin(min)
+                setPriceMax(max)
+              }}
+            />
             <FilterGroupList />
           </div>
 

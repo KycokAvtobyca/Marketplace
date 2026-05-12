@@ -2,10 +2,12 @@ import { PageTitle } from "@/shared/ui/ProductListTitle"
 import { FilterModalMenu } from "@/widgets/FilterModalMenu"
 import { FilterSidebar } from "@/widgets/FilterSidebar"
 import { ProductList } from "@/widgets/ProductList"
+import { CategoryBreadcrumbs } from "@/widgets/Breadcrumbs/ui/CategoryBreadcrumbs"
 
 export const HomePage = async () => {
   return (
     <section className="catalog space-y-4">
+      <CategoryBreadcrumbs />
       <header className="catalog__header">
         <div className="flex justify-between items-center">
           <PageTitle className="catalog__title" />

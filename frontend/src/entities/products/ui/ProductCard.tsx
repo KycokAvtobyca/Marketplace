@@ -61,7 +61,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const { data: favoritesData } = useGetFavorites()
   const isFavorite = favoritesData?.favorite_items?.some(
-    (item) => item.product_variant.id === product.id,
+    (item) => item.product_variant.id === product.variant_id,
   )
 
   const currentPrice = Number(product.price)
@@ -81,8 +81,10 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
   const handleAddToCart = () => {
     handleActionWithAuth(() => {
+      if (!product.variant_id) return
+
       addToCart(
-        { product_variant_id: product.variant_id || product.id, quantity: 1 },
+        { product_variant_id: product.variant_id, quantity: 1 },
         {
           onSuccess: () => {
             setMessage({ text: "Добавлено в корзину", type: "cart" })
@@ -106,7 +108,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         })
       } else {
         addToFavorites(
-          { product_variant_id: product.id },
+          { product_variant_id: product.variant_id || product.id },
           {
             onSuccess: () => {
               setMessage({ text: "В избранном", type: "fav" })
@@ -146,11 +148,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </Link>
 
       {/* Кнопка избранного */}
-        <button
-          onClick={handleToggleFavorite}
-          disabled={isAddingToFavorites || isRemovingFromFavorites}
-          className={clsx(
-            "absolute top-2 right-2 p-1 backdrop-blur-sm rounded-full transition-all shadow-sm z-10",
+      <button
+        onClick={handleToggleFavorite}
+        disabled={isAddingToFavorites || isRemovingFromFavorites}
+        className={clsx(
+          "absolute top-2 right-2 p-1 backdrop-blur-sm rounded-full transition-all shadow-sm z-10",
           isFavorite
             ? "bg-red-500 text-white"
             : "bg-white/80 text-slate-400 hover:text-red-500 hover:bg-white",
@@ -158,7 +160,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             "opacity-50 cursor-not-allowed",
         )}
       >
-          <Icon.HEARTGRAY className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
+        <Icon.HEARTGRAY className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
       </button>
 
       {/* Контент */}
@@ -175,10 +177,22 @@ export const ProductCard: React.FC<ProductCardProps> = ({
         </div>
 
         <Link href={`/products/${product.id}`}>
-          <h3 className="text-[11px] sm:text-sm text-slate-700 line-clamp-2 leading-tight mb-2 min-h-[2.5em] group-hover:text-brand-main transition-colors cursor-pointer">
+          <h3 className="text-[11px] sm:text-sm text-slate-700 line-clamp-2 leading-tight mb-1 min-h-[2.5em] group-hover:text-brand-main transition-colors cursor-pointer">
             {product.name}
           </h3>
         </Link>
+
+        {product.sku && (
+          <p className="text-[10px] sm:text-xs text-slate-500 mb-1">
+            Артикул: {product.sku}
+          </p>
+        )}
+
+        {product.description && (
+          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-2 mb-2">
+            {product.description}
+          </p>
+        )}
 
         <div className="mt-auto pt-2 flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-0.5 text-yellow-400 shrink-0">
@@ -190,7 +204,9 @@ export const ProductCard: React.FC<ProductCardProps> = ({
             </span>
           </div>
           <span className="text-[9px] sm:text-[11px] text-slate-400 text-right font-medium truncate uppercase tracking-tighter">
-            {product.stock && product.stock > 0 ? `Остаток: ${product.stock}` : "Нет в наличии"}
+            {product.stock && product.stock > 0
+              ? `Остаток: ${product.stock}`
+              : "Нет в наличии"}
           </span>
         </div>
 
@@ -206,7 +222,11 @@ export const ProductCard: React.FC<ProductCardProps> = ({
                 : "bg-brand-main text-white shadow-md shadow-brand-main/20 hover:brightness-110",
           )}
         >
-          {isAddingToCart ? "..." : !product.stock || product.stock <= 0 ? "Пусто" : "В корзину"}
+          {isAddingToCart
+            ? "..."
+            : !product.stock || product.stock <= 0
+              ? "Пусто"
+              : "В корзину"}
         </button>
       </div>
 

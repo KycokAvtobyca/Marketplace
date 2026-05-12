@@ -1,12 +1,11 @@
 "use client"
 
-import React from "react"
+import React, { useState } from "react"
 import clsx from "clsx"
 import { FilterGroupList } from "@/features/Filters"
 import { useFilterModalMenuStore } from "@/entities/filters"
-import { api } from "@/shared/api"
 import { getApiParams } from "@/shared/lib/getApiParams/getApiParams"
-import { ROUTES } from "@/shared/config"
+import { PriceRangeFilter } from "@/features/Filters/ui/PriceRangeFilter"
 
 interface FilterSidebarProps {
   className?: string
@@ -15,15 +14,20 @@ interface FilterSidebarProps {
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
   const { selectedFilters, setAppliedQueryString } = useFilterModalMenuStore()
   const resetFilters = useFilterModalMenuStore((s) => s.resetFilters)
-  const hasFilters = useFilterModalMenuStore(
-    (s) => s.selectedFilters.length > 0,
-  )
+  const [priceMin, setPriceMin] = useState("")
+  const [priceMax, setPriceMax] = useState("")
+  const hasFilters = selectedFilters.length > 0 || !!priceMin || !!priceMax
+
+  const handleResetFilters = () => {
+    resetFilters()
+    setPriceMin("")
+    setPriceMax("")
+    setAppliedQueryString("")
+  }
 
   const handleApply = () => {
     const params = getApiParams(selectedFilters)
 
-    // Превращаем объект { categories: ['obuv'], brands: ['nike'] }
-    // в строку "categories=obuv&brands=nike"
     const searchParams = new URLSearchParams()
 
     Object.entries(params).forEach(([key, values]) => {
@@ -32,9 +36,15 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
       }
     })
 
+    if (priceMin) {
+      searchParams.set("price_min", priceMin)
+    }
+    if (priceMax) {
+      searchParams.set("price_max", priceMax)
+    }
+
     const queryString = searchParams.toString()
 
-    // Сохраняем в стор -> это триггернет обновление ProductList
     setAppliedQueryString(queryString)
   }
 
@@ -52,7 +62,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
           Фильтры
         </h2>
         <button
-          onClick={resetFilters}
+          onClick={handleResetFilters}
           disabled={!hasFilters}
           className={clsx(
             "text-xs font-semibold text-brand-main transition-all uppercase tracking-wider",
@@ -68,6 +78,12 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
       <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-w-0">
         {/* Удаляем лишние gap, чтобы аккордеоны стояли плотно */}
         <div className="flex flex-col">
+          <PriceRangeFilter
+            onChange={(min, max) => {
+              setPriceMin(min)
+              setPriceMax(max)
+            }}
+          />
           <FilterGroupList isSidebar={true} />
         </div>
       </div>

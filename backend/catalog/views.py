@@ -1,12 +1,14 @@
+from decimal import Decimal, InvalidOperation
+
 from django.db.models import (
     Avg,
     Max,
     Min,
     OuterRef,
     Prefetch,
+    Q,
     Subquery,
     Sum,
-    Q,
 )
 from rest_framework import views, viewsets
 from rest_framework.request import Request
@@ -55,13 +57,47 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                     lookup = filter_map[clean_key]
                     queryset = queryset.filter(**{lookup: values})
 
+        min_price = self.request.query_params.get(
+            "price_min"
+        ) or self.request.query_params.get("min_price")
+        max_price = self.request.query_params.get(
+            "price_max"
+        ) or self.request.query_params.get("max_price")
+
+        if min_price:
+            try:
+                min_price_decimal = Decimal(min_price)
+                queryset = queryset.filter(
+                    variants__in=m.ProductVariant.objects.with_prices(
+                        user=user
+                    ).filter(
+                        is_active=True, discounted_price__gte=min_price_decimal
+                    )
+                )
+            except (InvalidOperation, ValueError):
+                pass
+
+        if max_price:
+            try:
+                max_price_decimal = Decimal(max_price)
+                queryset = queryset.filter(
+                    variants__in=m.ProductVariant.objects.with_prices(
+                        user=user
+                    ).filter(
+                        is_active=True, discounted_price__lte=max_price_decimal
+                    )
+                )
+            except (InvalidOperation, ValueError):
+                pass
+
         # --- ПОИСК ПО НАЗВАНИЮ И ОПИСАНИЮ ---
         search_query = self.request.query_params.get("search", "").strip()
         if search_query:
             queryset = queryset.filter(
-                Q(name__icontains=search_query) |
-                Q(description__icontains=search_query) |
-                Q(brand__name__icontains=search_query)
+                Q(name__icontains=search_query)
+                | Q(description__icontains=search_query)
+                | Q(brand__name__icontains=search_query)
+                | Q(variants__attribute_values__value__icontains=search_query)
             )
 
         # --- ЛОГИКА ПОДЗАПРОСОВ ---
@@ -73,8 +109,16 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             variant__product=OuterRef("pk"), is_main=True
         ).values("image")
 
-        from django.db.models import Case, When, IntegerField
-        
+        sku_sq = (
+            m.ProductVariant.objects.filter(
+                product=OuterRef("pk"), is_active=True
+            )
+            .order_by("-is_main", "pk")
+            .values("sku")[:1]
+        )
+
+        from django.db.models import Case, IntegerField, When
+
         return (
             queryset.annotate(
                 api_price=Subquery(
@@ -84,6 +128,7 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                 ),
                 api_old_price=Min("variants__price"),
                 api_image=Subquery(main_image_sq[:1]),
+                api_sku=Subquery(sku_sq),
                 api_rating=Avg("variants__reviews__rating"),
                 api_stock=Sum("variants__stock"),
                 # Явное значение для сортировки:
@@ -91,8 +136,8 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                 has_stock=Case(
                     When(api_stock__gt=0, then=1),
                     default=0,
-                    output_field=IntegerField()
-                )
+                    output_field=IntegerField(),
+                ),
             )
             .select_related("brand", "shop")
             .distinct()

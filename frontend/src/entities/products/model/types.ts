@@ -1,6 +1,8 @@
 export interface Product {
   id: number
   name: string
+  description?: string
+  sku?: string | null
   price: string // Приходит строкой (Decimal)
   old_price: string
   image: string

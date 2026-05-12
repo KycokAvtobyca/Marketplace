@@ -22,7 +22,8 @@ export default function ProfilePage() {
   const { data: shop, isError: shopError } = useMyShop()
   const { data: orders } = useOrders()
   const { data: hasAdminAccess } = useCheckAdminAccess()
-  const { mutate: redirectToAdmin, isPending: isRedirecting } = useRedirectToAdmin()
+  const { mutate: redirectToAdmin, isPending: isRedirecting } =
+    useRedirectToAdmin()
 
   const [formData, setFormData] = useState({
     name: "",
@@ -82,7 +83,7 @@ export default function ProfilePage() {
       {
         onSuccess: () => setPhoneStep("verify_old"),
         onError: () => setPhoneError("Ошибка отправки кода"),
-      }
+      },
     )
   }
 
@@ -93,7 +94,7 @@ export default function ProfilePage() {
       {
         onSuccess: () => setPhoneStep("enter_new"),
         onError: () => setPhoneError("Неверный код"),
-      }
+      },
     )
   }
 
@@ -105,7 +106,7 @@ export default function ProfilePage() {
         onSuccess: () => setPhoneStep("verify_new"),
         onError: (err: any) =>
           setPhoneError(err.response?.data?.phone_number || "Ошибка"),
-      }
+      },
     )
   }
 
@@ -122,7 +123,7 @@ export default function ProfilePage() {
           window.location.reload()
         },
         onError: () => setPhoneError("Неверный код"),
-      }
+      },
     )
   }
 
@@ -133,11 +134,12 @@ export default function ProfilePage() {
 
       {/* Основная информация */}
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-lg font-bold mb-4">
-          👤 Личные данные
-        </h2>
+        <h2 className="text-lg font-bold mb-4">👤 Личные данные</h2>
 
-        <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <form
+          onSubmit={handleSubmit}
+          className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+        >
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">
               Имя
@@ -211,7 +213,10 @@ export default function ProfilePage() {
             >
               {isUpdating ? "Сохранение..." : "Сохранить изменения"}
             </button>
-            <p className="text-xs text-green-600 mt-2 hidden" id="profile-success">
+            <p
+              className="text-xs text-green-600 mt-2 hidden"
+              id="profile-success"
+            >
               ✅ Данные сохранены
             </p>
           </div>
@@ -220,9 +225,7 @@ export default function ProfilePage() {
 
       {/* Телефон */}
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-lg font-bold mb-4">
-          📞 Номер телефона
-        </h2>
+        <h2 className="text-lg font-bold mb-4">📞 Номер телефона</h2>
         <div className="flex items-center gap-4">
           <span className="text-lg font-medium">{profile.phone_number}</span>
           {phoneStep === "idle" && (
@@ -264,7 +267,9 @@ export default function ProfilePage() {
             )}
             {phoneStep === "enter_new" && (
               <>
-                <p className="text-sm text-slate-500">Введите новый номер телефона</p>
+                <p className="text-sm text-slate-500">
+                  Введите новый номер телефона
+                </p>
                 <div className="flex gap-2">
                   <input
                     type="tel"
@@ -313,18 +318,14 @@ export default function ProfilePage() {
                 </div>
               </>
             )}
-            {phoneError && (
-              <p className="text-sm text-red-500">{phoneError}</p>
-            )}
+            {phoneError && <p className="text-sm text-red-500">{phoneError}</p>}
           </div>
         )}
       </section>
 
       {/* Магазин */}
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-lg font-bold mb-4">
-          🏪 Магазин
-        </h2>
+        <h2 className="text-lg font-bold mb-4">🏪 Магазин</h2>
         {shop ? (
           <div className="space-y-3">
             <p className="font-medium">{shop.name}</p>
@@ -354,28 +355,76 @@ export default function ProfilePage() {
 
       {/* Заказы */}
       <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-        <h2 className="text-lg font-bold mb-4">
-          📦 История заказов
-        </h2>
+        <h2 className="text-lg font-bold mb-4">📦 История заказов</h2>
         {orders && orders.length > 0 ? (
-          <div className="space-y-3">
+          <div className="space-y-6">
             {orders.map((order) => (
               <div
                 key={order.id}
-                className="flex items-center justify-between p-3 bg-slate-50 rounded-xl"
+                className="rounded-3xl border border-slate-200 bg-slate-50 p-5"
               >
-                <div>
-                  <p className="font-medium">Заказ #{order.id}</p>
-                  <p className="text-xs text-slate-500">
-                    {order.status_display} · {order.delivery_type_display}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {new Date(order.date_time_create).toLocaleDateString("ru-RU")}
-                  </p>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <p className="font-semibold text-slate-900">
+                      Заказ #{order.id}
+                    </p>
+                    <p className="text-sm text-slate-500">
+                      {order.status_display} · {order.delivery_type_display}
+                    </p>
+                    <p className="text-sm text-slate-400">
+                      {new Date(order.date_time_create).toLocaleDateString(
+                        "ru-RU",
+                      )}{" "}
+                      •{" "}
+                      {order.branch_display ||
+                        order.address ||
+                        "Адрес не указан"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-sm text-slate-500">Итого</p>
+                    <p className="font-bold text-brand-main text-lg">
+                      {Number(order.total_cost).toLocaleString("ru-RU")} ₽
+                    </p>
+                  </div>
                 </div>
-                <p className="font-bold text-brand-main">
-                  {Number(order.total_cost).toLocaleString("ru-RU")} ₽
-                </p>
+
+                <div className="mt-4 space-y-3">
+                  {order.order_items.map((item) => (
+                    <div
+                      key={item.id}
+                      className="grid grid-cols-[72px_1fr] gap-3 rounded-2xl bg-white p-3 shadow-sm"
+                    >
+                      <img
+                        src={item.product_variant_image || "/placeholder.png"}
+                        alt={item.product_variant_name}
+                        className="h-18 w-18 rounded-2xl object-cover"
+                      />
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium text-slate-900">
+                          {item.product_variant_name}
+                        </p>
+                        <p className="text-slate-500">
+                          Артикул: {item.product_variant_sku}
+                        </p>
+                        <p className="text-slate-500">
+                          Количество: {item.quantity}
+                        </p>
+                        <p className="text-slate-500">
+                          Цена:{" "}
+                          {Number(
+                            item.discounted_price_per_item,
+                          ).toLocaleString("ru-RU")}{" "}
+                          ₽
+                        </p>
+                        <p className="font-medium text-slate-900">
+                          Сумма:{" "}
+                          {Number(item.total_price).toLocaleString("ru-RU")} ₽
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             ))}
           </div>
