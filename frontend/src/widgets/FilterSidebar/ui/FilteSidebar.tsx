@@ -1,6 +1,7 @@
 "use client"
 
 import React, { useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import clsx from "clsx"
 import { FilterGroupList } from "@/features/Filters"
 import { useFilterModalMenuStore } from "@/entities/filters"
@@ -12,6 +13,8 @@ interface FilterSidebarProps {
 }
 
 export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { selectedFilters, setAppliedQueryString } = useFilterModalMenuStore()
   const resetFilters = useFilterModalMenuStore((s) => s.resetFilters)
   const [priceMin, setPriceMin] = useState("")
@@ -23,37 +26,56 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
     setPriceMin("")
     setPriceMax("")
     setAppliedQueryString("")
+
+    const preservedSearch = searchParams.get("search")?.trim()
+    const params = new URLSearchParams()
+    if (preservedSearch) params.set("search", preservedSearch)
+
+    const searchUrl = params.toString()
+    router.replace(
+      searchUrl
+        ? `${window.location.pathname}?${searchUrl}`
+        : window.location.pathname,
+    )
   }
 
   const handleApply = () => {
     const params = getApiParams(selectedFilters)
+    const searchParamsForUrl = new URLSearchParams()
 
-    const searchParams = new URLSearchParams()
+    const preservedSearch = searchParams.get("search")?.trim()
+    if (preservedSearch) {
+      searchParamsForUrl.set("search", preservedSearch)
+    }
 
     Object.entries(params).forEach(([key, values]) => {
       if (Array.isArray(values)) {
-        values.forEach((val) => searchParams.append(key, val))
+        values.forEach((val) => searchParamsForUrl.append(key, val))
       }
     })
 
     if (priceMin) {
-      searchParams.set("price_min", priceMin)
+      searchParamsForUrl.set("price_min", priceMin)
     }
     if (priceMax) {
-      searchParams.set("price_max", priceMax)
+      searchParamsForUrl.set("price_max", priceMax)
     }
 
-    const queryString = searchParams.toString()
+    const queryString = searchParamsForUrl.toString()
 
     setAppliedQueryString(queryString)
+    router.push(
+      queryString
+        ? `${window.location.pathname}?${queryString}`
+        : window.location.pathname,
+    )
   }
 
   return (
     <aside
       className={clsx(
-        "flex flex-col w-64 shrink-0 hidden min-[800px]:flex",
-        "bg-white border border-slate-100 rounded-2xl p-4 shadow-sm", // Небольшая тень вместо бордера
-        "sticky top-4 max-h-[calc(100vh-32px)]",
+        "self-start flex flex-col w-64 shrink-0 hidden min-[800px]:flex",
+        "bg-white border border-slate-100 rounded-2xl p-4 shadow-sm",
         className,
       )}
     >
@@ -75,7 +97,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
         </button>
       </div>
 
-      <div className="flex-1 overflow-y-auto custom-scrollbar pr-1 min-w-0">
+      <div className="pr-1 min-w-0">
         {/* Удаляем лишние gap, чтобы аккордеоны стояли плотно */}
         <div className="flex flex-col">
           <PriceRangeFilter

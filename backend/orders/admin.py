@@ -91,18 +91,22 @@ class OrderAdmin(admin.ModelAdmin):
     def has_module_permission(self, request):
         if request.user.is_superuser:
             return True
-        return request.user.is_staff and hasattr(request.user, "shop")
+        if not request.user.is_staff:
+            return False
+        if not hasattr(request.user, "shop"):
+            return False
+        return request.user.shop.exists()
 
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
         if not request.user.is_staff:
             return False
-        if obj is None:
-            return True
         shop = request.user.shop.first()
         if not shop:
             return False
+        if obj is None:
+            return True
         return obj.order_items.filter(
             product_variant__product__shop=shop
         ).exists()

@@ -21,7 +21,7 @@ export const HomePage = async () => {
       </header>
 
       {/* Основной контент*/}
-      <div className="flex gap-4">
+      <div className="flex items-start gap-4">
         <FilterSidebar />
 
         <main className="grow min-w-0">

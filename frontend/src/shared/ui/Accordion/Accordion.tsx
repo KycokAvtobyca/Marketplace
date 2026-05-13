@@ -80,15 +80,13 @@ const AccordionItem: React.FC<AccordionItemProps> = ({
         <div
           ref={divSwitchRef}
           className={clsx(
-            "grid transition-all duration-300 ease-in-out",
-            isVisible
-              ? "grid-rows-[1fr] opacity-100"
-              : "grid-rows-[0fr] opacity-0 overflow-hidden",
+            "overflow-hidden transition-all duration-300 ease-in-out",
+            isVisible ? "max-h-[9999px] opacity-100" : "max-h-0 opacity-0",
           )}
         >
-          <div className="min-h-0">
+          <div className="py-1">
             {/* Тонкая, почти незаметная линия иерархии */}
-            <div className="border-l-2 border-brand-main/20 ml-4 pl-3 py-1 space-y-1">
+            <div className="border-l-2 border-brand-main/20 ml-4 pl-3 space-y-1">
               {content}
             </div>
           </div>

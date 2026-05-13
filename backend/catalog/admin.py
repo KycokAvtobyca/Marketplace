@@ -18,67 +18,73 @@ class ShopOwnerAdminMixin:
             return getattr(obj.variant.product, "shop", None)
         return None
 
+    def _get_user_shop(self, request):
+        if not request.user.is_staff:
+            return None
+        if not hasattr(request.user, "shop"):
+            return None
+        return request.user.shop.first()
+
     def get_queryset(self, request):
         qs = super().get_queryset(request)
         if request.user.is_superuser:
             return qs
-        if hasattr(request.user, "shop"):
-            shop = request.user.shop.first()
-            if shop:
-                if hasattr(self.model, "shop"):
-                    return qs.filter(shop=shop)
-                if hasattr(self.model, "product"):
-                    return qs.filter(product__shop=shop)
-                if hasattr(self.model, "variant"):
-                    return qs.filter(variant__product__shop=shop)
+        shop = self._get_user_shop(request)
+        if shop:
+            if hasattr(self.model, "shop"):
+                return qs.filter(shop=shop)
+            if hasattr(self.model, "product"):
+                return qs.filter(product__shop=shop)
+            if hasattr(self.model, "variant"):
+                return qs.filter(variant__product__shop=shop)
         return qs.none()
 
     def has_module_permission(self, request):
         if request.user.is_superuser:
             return True
-        return request.user.is_staff and hasattr(request.user, "shop")
+        return bool(self._get_user_shop(request))
 
     def has_view_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if not request.user.is_staff:
+        shop = self._get_user_shop(request)
+        if not shop:
             return False
         if obj is None:
             return True
-        shop = request.user.shop.first()
         obj_shop = self._get_shop_from_obj(obj)
-        return shop and obj_shop == shop
+        return obj_shop == shop
 
     def has_change_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if not request.user.is_staff:
+        shop = self._get_user_shop(request)
+        if not shop:
             return False
         if obj is None:
             return True
-        shop = request.user.shop.first()
         obj_shop = self._get_shop_from_obj(obj)
-        return shop and obj_shop == shop
+        return obj_shop == shop
 
     def has_delete_permission(self, request, obj=None):
         if request.user.is_superuser:
             return True
-        if not request.user.is_staff:
+        shop = self._get_user_shop(request)
+        if not shop:
             return False
         if obj is None:
             return True
-        shop = request.user.shop.first()
         obj_shop = self._get_shop_from_obj(obj)
-        return shop and obj_shop == shop
+        return obj_shop == shop
 
     def has_add_permission(self, request):
         if request.user.is_superuser:
             return True
-        return request.user.is_staff and hasattr(request.user, "shop")
+        return bool(self._get_user_shop(request))
 
     def save_model(self, request, obj, form, change):
         if not request.user.is_superuser:
-            shop = request.user.shop.first()
+            shop = self._get_user_shop(request)
             if shop and hasattr(obj, "shop"):
                 obj.shop = shop
         super().save_model(request, obj, form, change)

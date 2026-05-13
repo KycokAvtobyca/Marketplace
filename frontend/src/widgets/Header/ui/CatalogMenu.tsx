@@ -149,13 +149,13 @@ export const CatalogMenu: React.FC<CatalogMenuProps> = ({
         createPortal(
           <div
             className={clsx(
-              "fixed inset-x-0 top-[5rem] z-50 flex justify-center px-2 transition-opacity duration-220",
+              "fixed inset-x-0 top-[5rem] z-50 flex justify-center px-4 sm:px-6 transition-opacity duration-220",
               isVisible ? "opacity-100" : "opacity-0 pointer-events-none",
             )}
             onClick={close}
           >
             <div
-              className="relative w-full overflow-hidden rounded-[1rem]"
+              className="relative mx-auto w-full max-w-[1000px] overflow-hidden rounded-[1rem]"
               onClick={(event) => event.stopPropagation()}
             >
               <div className="w-full bg-white shadow-2xl shadow-brand-main/10 rounded-[1rem] border border-brand-main/10">

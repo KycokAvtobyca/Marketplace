@@ -188,12 +188,6 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </p>
         )}
 
-        {product.description && (
-          <p className="text-[10px] sm:text-xs text-slate-500 line-clamp-2 mb-2">
-            {product.description}
-          </p>
-        )}
-
         <div className="mt-auto pt-2 flex items-center justify-between gap-2 mb-3">
           <div className="flex items-center gap-0.5 text-yellow-400 shrink-0">
             <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20">

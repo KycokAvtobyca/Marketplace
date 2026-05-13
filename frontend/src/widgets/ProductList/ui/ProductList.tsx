@@ -15,10 +15,12 @@ export const ProductList = () => {
   )
   const searchParams = useSearchParams()
   const search = searchParams?.get("search")?.trim() || ""
-  const category =
-    searchParams?.get("categories")?.trim() ||
-    searchParams?.get("category")?.trim() ||
-    ""
+  const urlCategories = searchParams?.getAll("categories") || []
+  const urlCategoryAlias = searchParams?.get("category")?.trim()
+  const categoriesFromUrl = [
+    ...urlCategories.map((value) => value?.trim()).filter(Boolean),
+    ...(urlCategoryAlias ? [urlCategoryAlias] : []),
+  ]
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams(appliedQueryString)
@@ -28,15 +30,15 @@ export const ProductList = () => {
       params.delete("search")
     }
 
-    // Добавляем категорию из URL
-    if (category) {
-      params.set("categories", category)
+    if (categoriesFromUrl.length > 0) {
+      params.delete("categories")
+      categoriesFromUrl.forEach((cat) => params.append("categories", cat))
     } else {
       params.delete("categories")
     }
 
     return params.toString()
-  }, [appliedQueryString, search, category])
+  }, [appliedQueryString, search, categoriesFromUrl])
 
   // Используем ваш хук.
   // Как только appliedQueryString или search изменятся, React Query сделает новый запрос.
@@ -83,8 +85,6 @@ export const ProductList = () => {
   }
 
   const products = data?.results || []
-
-  console.log("Полученные товары:", data, products)
 
   if (products.length === 0) {
     return (

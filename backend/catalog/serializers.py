@@ -249,7 +249,7 @@ class ProductSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Product
-        exclude = ["description", "updated_by"]
+        exclude = ["updated_by"]
 
 
 # class FiltersSerializer(serializers.Serializer):

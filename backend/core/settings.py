@@ -153,6 +153,7 @@ USE_TZ = True
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "static"
 LOGOUT_REDIRECT_URL = "http://127.0.0.1:3000/"
+X_FRAME_OPTIONS = "SAMEORIGIN"
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:3000",
