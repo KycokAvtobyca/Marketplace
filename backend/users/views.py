@@ -1,12 +1,12 @@
 import random
 
+from common.phone import PhoneValidationError, normalize_ru_mobile_phone
 from api.authentication import HttpOnlyJWTAuthentication
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from phonenumber_field.phonenumber import to_python
 from rest_framework import status, viewsets
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -42,7 +42,7 @@ class HybridTokenObtainView(TokenObtainPairView):
 
         response = super().post(request, *args, **kwargs)
 
-        if response.status_code == 200:
+        if response.status_code == 200 and response.data.get("access"):
             # Достаем токены, которые приготовил нам сериализатор
             access_token = response.data.get("access")
             refresh_token = response.data.get("refresh")
@@ -115,16 +115,13 @@ class SendSMSView(APIView):
 
     def post(self, request):
         phone_raw = request.data.get("phone_number")
-        phone_obj = to_python(phone_raw)
-        print(request, phone_raw, phone_obj)
-
-        if not phone_obj or not phone_obj.is_valid():
+        try:
+            phone_normalized = normalize_ru_mobile_phone(phone_raw)
+        except PhoneValidationError as exc:
             return Response(
-                {"phone_number": "Неверный формат номера телефона (РФ)"},
+                {"phone_number": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
-        phone_normalized = str(phone_obj)
 
         # last_code = SMSCode.objects.filter(
         #     phone_number=phone_normalized
@@ -150,8 +147,11 @@ class SendSMSView(APIView):
         expiry_time = timezone.now() - timezone.timedelta(minutes=1)
         SMSCode.objects.filter(date_time_create__lt=expiry_time).delete()
 
-        # Создаем смс-код
-        SMSCode.objects.create(phone_number=phone_normalized, code=code)
+        # Создаем или обновляем смс-код
+        SMSCode.objects.update_or_create(
+            phone_number=phone_normalized,
+            defaults={"code": code, "date_time_create": timezone.now()},
+        )
 
         print("\n" + "=" * 30)
         print(f"SMS ДЛЯ НОМЕРА: {phone_normalized}")
@@ -194,7 +194,10 @@ class PhoneChangeView(APIView):
             code = f"{random.randint(0, 999999):06d}"
             expiry_time = timezone.now() - timezone.timedelta(minutes=1)
             SMSCode.objects.filter(date_time_create__lt=expiry_time).delete()
-            SMSCode.objects.create(phone_number=old_phone, code=code)
+            SMSCode.objects.update_or_create(
+                phone_number=old_phone,
+                defaults={"code": code, "date_time_create": timezone.now()},
+            )
 
             print("\n" + "=" * 30)
             print(f"SMS СМЕНА ТЕЛЕФОНА - СТАРЫЙ НОМЕР: {old_phone}")
@@ -223,15 +226,13 @@ class PhoneChangeView(APIView):
 
         elif action == "send_new":
             new_phone_raw = request.data.get("new_phone")
-            new_phone_obj = to_python(new_phone_raw)
-
-            if not new_phone_obj or not new_phone_obj.is_valid():
+            try:
+                new_phone = normalize_ru_mobile_phone(new_phone_raw)
+            except PhoneValidationError as exc:
                 return Response(
-                    {"phone_number": "Неверный формат номера телефона (РФ)"},
+                    {"phone_number": str(exc)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-
-            new_phone = str(new_phone_obj)
 
             if CustomUser.objects.filter(phone_number=new_phone).exclude(
                 pk=request.user.pk
@@ -244,7 +245,10 @@ class PhoneChangeView(APIView):
             code = f"{random.randint(0, 999999):06d}"
             expiry_time = timezone.now() - timezone.timedelta(minutes=1)
             SMSCode.objects.filter(date_time_create__lt=expiry_time).delete()
-            SMSCode.objects.create(phone_number=new_phone, code=code)
+            SMSCode.objects.update_or_create(
+                phone_number=new_phone,
+                defaults={"code": code, "date_time_create": timezone.now()},
+            )
 
             print("\n" + "=" * 30)
             print(f"SMS СМЕНА ТЕЛЕФОНА - НОВЫЙ НОМЕР: {new_phone}")
@@ -255,8 +259,13 @@ class PhoneChangeView(APIView):
 
         elif action == "verify_new":
             new_phone_raw = request.data.get("new_phone")
-            new_phone_obj = to_python(new_phone_raw)
-            new_phone = str(new_phone_obj)
+            try:
+                new_phone = normalize_ru_mobile_phone(new_phone_raw)
+            except PhoneValidationError as exc:
+                return Response(
+                    {"phone_number": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             code = request.data.get("code")
 
             valid_code = SMSCode.objects.filter(
@@ -346,6 +355,53 @@ class MyShopView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
         return Response(ShopSerializer(shop).data)
+
+
+class ShopReportOptionsView(APIView):
+    authentication_classes = [HttpOnlyJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        from catalog.models import Brand, Category, Product, ProductType
+
+        if not request.user.is_staff:
+            return Response(
+                {"detail": "Доступ запрещен."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        shop = (
+            Shop.objects.filter(pk=request.query_params.get("shop")).first()
+            if request.user.is_superuser and request.query_params.get("shop")
+            else Shop.objects.filter(owner=request.user).first()
+        )
+
+        if not shop and request.user.is_superuser:
+            shop = Shop.objects.order_by("name").first()
+
+        if not shop:
+            return Response(
+                {"detail": "У пользователя нет магазина для отчета."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        products = Product.objects.filter(shop=shop)
+
+        categories = Category.objects.filter(product__in=products).distinct()
+        product_types = ProductType.objects.filter(products__in=products).distinct()
+        brands = Brand.objects.filter(products__in=products).distinct()
+
+        serialize = lambda qs: [
+            {"id": obj.pk, "name": obj.name} for obj in qs.order_by("name")
+        ]
+
+        return Response(
+            {
+                "categories": serialize(categories),
+                "product_types": serialize(product_types),
+                "brands": serialize(brands),
+            }
+        )
 
 
 from rest_framework.permissions import BasePermission

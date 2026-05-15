@@ -1,4 +1,5 @@
 from catalog.models import ProductVariant
+from decimal import Decimal
 from rest_framework import serializers
 
 from .models import Cart, CartItem
@@ -8,6 +9,7 @@ class ProductVariantBriefSerializer(serializers.ModelSerializer):
     """Краткая инфа о товаре для списков корзины и избранного"""
 
     product_name = serializers.CharField(source="product.name", read_only=True)
+    product_id = serializers.IntegerField(source="product.id", read_only=True)
     product_slug = serializers.CharField(source="product.slug", read_only=True)
     brand = serializers.CharField(
         source="product.brand.name", allow_null=True, read_only=True
@@ -20,6 +22,7 @@ class ProductVariantBriefSerializer(serializers.ModelSerializer):
             "id",
             "sku",
             "product_name",
+            "product_id",
             "product_slug",
             "brand",
             "price",
@@ -59,6 +62,10 @@ class CartSerializer(serializers.ModelSerializer):
     total_cost = serializers.DecimalField(
         read_only=True, max_digits=10, decimal_places=2
     )
+    promocode_code = serializers.CharField(
+        source="promocode.code", read_only=True, allow_null=True
+    )
+    promocode_discount = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
@@ -68,4 +75,13 @@ class CartSerializer(serializers.ModelSerializer):
             "total_items_price",
             "total_cost",
             "promocode",
+            "promocode_code",
+            "promocode_discount",
         ]
+
+    def get_promocode_discount(self, obj):
+        if not obj.promocode_id:
+            return "0.00"
+
+        discount = Decimal(obj.total_items_price) - Decimal(obj.total_cost)
+        return f"{max(Decimal('0.00'), discount):.2f}"

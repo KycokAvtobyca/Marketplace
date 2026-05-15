@@ -44,19 +44,35 @@ class ProductVariantQuerySet(models.QuerySet):
         )
 
         # Расширяем фильтр, если передан авторизованный пользователь
+        segment_ids = []
+
         if user and user.is_authenticated:
             discount_filter |= models.Q(user_id=user.id)
 
-            segment_ids = user.segments.values_list("id", flat=True)
+            segment_ids = list(user.segments.values_list("id", flat=True))
 
             if segment_ids:
                 discount_filter |= models.Q(segment_id__in=segment_ids)
 
+        excluded_filter = (
+            models.Q(excluded_variants=OuterRef("pk"))
+            | models.Q(excluded_products=OuterRef("product_id"))
+            | models.Q(excluded_brands=OuterRef("product__brand_id"))
+            | models.Q(excluded_categories=OuterRef("product__category_id"))
+            | models.Q(excluded_tags__in=Subquery(product_tags_ids))
+        )
+
         active_discounts = (
             Discount.objects.active()
             .filter(discount_filter)
+            .exclude(excluded_filter)
             .order_by("-priority")
         )
+
+        if user and user.is_authenticated:
+            active_discounts = active_discounts.exclude(
+                excluded_users=user
+            ).exclude(excluded_segments__in=segment_ids)
 
         return self.annotate(
             discount_pct=Coalesce(

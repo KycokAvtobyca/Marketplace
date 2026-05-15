@@ -15,6 +15,7 @@ interface FavoritesResponse {
       id: number
       sku: string
       product_name: string
+      product_id: number
       product_slug: string
       brand: string | null
       price: number
@@ -141,7 +142,7 @@ export const useClearFavorites = () => {
   return useMutation({
     mutationFn: async (): Promise<FavoritesApiAction> => {
       try {
-        const response = await api.delete<{
+        await api.delete<{
           message: string
         }>(ROUTES.FAVORITES.CLEAR)
 

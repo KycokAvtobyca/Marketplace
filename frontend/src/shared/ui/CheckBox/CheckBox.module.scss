@@ -1,8 +1,7 @@
 @reference "../../../shared/styles/_tailwind.css";
 
 .inputHidden {
-  @apply absolute w-0 h-0 overflow-hidden;
-  clip: rect(0 0 0 0);
+  @apply absolute left-0 top-0 h-5 w-5 cursor-pointer opacity-0;
 }
 
 .checkmark {

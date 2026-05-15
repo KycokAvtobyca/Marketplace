@@ -9,7 +9,7 @@ export const HomePage = async () => {
     <section className="catalog space-y-4">
       <CategoryBreadcrumbs />
       <header className="catalog__header">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col gap-3 min-[480px]:flex-row min-[480px]:items-center min-[480px]:justify-between">
           <PageTitle className="catalog__title" />
 
           <div className="block min-[800px]:hidden">
@@ -21,10 +21,10 @@ export const HomePage = async () => {
       </header>
 
       {/* Основной контент*/}
-      <div className="flex items-start gap-4">
+      <div className="flex min-w-0 items-start gap-4">
         <FilterSidebar />
 
-        <main className="grow min-w-0">
+        <main className="min-w-0 grow">
           <ProductList />
         </main>
       </div>

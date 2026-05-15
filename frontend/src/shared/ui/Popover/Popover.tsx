@@ -93,7 +93,7 @@ export const Popover = ({
       arrowLeft: d.width / 2 + (anchorCenter - targetLeft),
       isTop,
     })
-  }, [anchorRef, isOpen])
+  }, [anchorRef, padding])
 
   // Создаем умную версию функции обновления
   const scheduleUpdate = useCallback(() => {
@@ -185,7 +185,7 @@ export const Popover = ({
         minWidth: `${coords.minWidth}px`,
       }}
       className={clsx(
-        "bg-default w-max rounded-xl shadow-default opacity-0 transition-opacity duration-300",
+        "w-max max-w-[calc(100vw-1rem)] rounded-xl bg-default opacity-0 shadow-default transition-opacity duration-300",
         isVisible
           ? "opacity-100 pointer-events-auto"
           : "opacity-0 pointer-events-none",
@@ -205,7 +205,7 @@ export const Popover = ({
         />
       )}
 
-      <div className="overflow-auto p-2">{children}</div>
+      <div className="max-w-full overflow-auto p-2">{children}</div>
     </div>,
     portalRoot,
   )

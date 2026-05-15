@@ -13,6 +13,7 @@ psycopg==3.3.3
 pydot==4.0.1
 PyJWT==2.12.1
 pyparsing==3.3.2
+reportlab==4.4.5
 slugify==0.0.1
 sqlparse==0.5.5
 uuid==1.30

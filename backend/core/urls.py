@@ -32,6 +32,7 @@ from drf_spectacular.views import (
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 from core import settings
+from core.admin_reports import shop_report_view, table_report_view
 
 # Переопределяем site_url админки на фронтенд
 admin.site.site_url = "http://127.0.0.1:3000/"
@@ -74,6 +75,16 @@ class AdminAutoLoginView(View):
 
 urlpatterns = [
     path("admin-login/", AdminAutoLoginView.as_view(), name="admin-auto-login"),
+    path(
+        "admin/reports/shop/",
+        admin.site.admin_view(shop_report_view),
+        name="admin_shop_report",
+    ),
+    path(
+        "admin/reports/table/",
+        admin.site.admin_view(table_report_view),
+        name="admin_table_report",
+    ),
     path("admin/", admin.site.urls),
     path("api/v1/", include("api.urls")),
     # Путь для скачивания самого файла схемы (yaml/json)

@@ -1,5 +1,5 @@
+from common.phone import PhoneValidationError, normalize_ru_mobile_phone
 from django.utils import timezone
-from phonenumber_field.modelfields import PhoneNumberField
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
@@ -7,7 +7,7 @@ from .models import CustomUser, Shop, SMSCode
 
 
 class HybridTokenSerializer(TokenObtainPairSerializer):
-    phone_number = PhoneNumberField(region="RU")
+    phone_number = serializers.CharField()
     sms_code = serializers.CharField(write_only=True)
 
     def __init__(self, *args, **kwargs):
@@ -16,7 +16,10 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
         self.fields["password"].required = False
 
     def validate(self, attrs):
-        phone = attrs.get("phone_number")
+        try:
+            phone = normalize_ru_mobile_phone(attrs.get("phone_number"))
+        except PhoneValidationError as exc:
+            raise serializers.ValidationError({"phone_number": str(exc)}) from exc
         password = attrs.get("password")
         code = attrs.get("sms_code")
 
@@ -36,11 +39,23 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
 
         user, created = CustomUser.objects.get_or_create(phone_number=phone)
 
+        if not user.is_active:
+            raise serializers.ValidationError(
+                {
+                    "detail": {
+                        "message": "Ваш аккаунт заблокирован.",
+                        "code": "user_blocked",
+                    }
+                }
+            )
+
         if user.is_superuser:
             if not password:
-                raise serializers.ValidationError(
-                    {"password": "Пароль обязателен для администратора"}
-                )
+                return {
+                    "requires_password": True,
+                    "is_superuser": True,
+                    "phone_number": phone,
+                }
 
             if not user.check_password(password):
                 raise serializers.ValidationError(
@@ -55,6 +70,8 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
             "refresh": str(refresh),
             "access": str(refresh.access_token),
             "is_new_user": created,
+            "is_staff": user.is_staff,
+            "is_superuser": user.is_superuser,
         }
 
 

@@ -34,8 +34,17 @@ class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
     ordering = ("-date_time_create",)
     list_per_page = 25
     date_hierarchy = "date_time_create"
+    actions = ("block_users", "unblock_users")
 
     readonly_fields = ("date_time_create", "date_time_update", "last_login")
+
+    @admin.action(description="Заблокировать выбранных пользователей")
+    def block_users(self, request, queryset):
+        queryset.exclude(is_superuser=True).update(is_active=False)
+
+    @admin.action(description="Разблокировать выбранных пользователей")
+    def unblock_users(self, request, queryset):
+        queryset.update(is_active=True)
 
     def get_fieldsets(self, request, obj=None):
         """Убрать раздел пароля для не-суперпользователей."""

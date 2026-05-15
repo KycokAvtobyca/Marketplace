@@ -7,9 +7,10 @@ export interface CreateOrderPayload {
   delivery_type: "PICKUP" | "COURIER"
   branch?: string | null
   address?: string | null
-  address_data?: Record<string, any>
+  address_data?: Record<string, unknown>
   name: string
   phone_number: string
+  date_time_deliver?: string | null
   description?: string
 }
 

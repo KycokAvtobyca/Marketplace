@@ -35,9 +35,14 @@ interface IBaseFilterHook<TData> {
   variables: FilterVariables
 }
 
-function hasPagination(obj: any): obj is PaginatedData {
+function hasPagination(obj: unknown): obj is PaginatedData {
+  if (!obj || typeof obj !== "object") return false
+
+  const candidate = obj as PaginatedData
+
   return (
-    obj && (typeof obj.next === "string" || typeof obj.previous === "string")
+    typeof candidate.next === "string" ||
+    typeof candidate.previous === "string"
   )
 }
 

@@ -1,6 +1,6 @@
 "use client"
 
-import React, { useEffect, useState } from "react"
+import React, { useState } from "react"
 import { usePriceRange } from "@/entities/products/api/usePriceRange"
 
 interface PriceRangeFilterProps {
@@ -13,13 +13,6 @@ export const PriceRangeFilter: React.FC<PriceRangeFilterProps> = ({
   const { data: range, isLoading } = usePriceRange()
   const [minPrice, setMinPrice] = useState("")
   const [maxPrice, setMaxPrice] = useState("")
-
-  useEffect(() => {
-    if (range && !minPrice && !maxPrice) {
-      setMinPrice(String(range.min || ""))
-      setMaxPrice(String(range.max || ""))
-    }
-  }, [range])
 
   const handleMinChange = (value: string) => {
     const digitsOnly = value.replace(/[^0-9]/g, "")

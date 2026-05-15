@@ -18,51 +18,53 @@ export const useMountTransition = ({
   callbackAfterOpen,
 }: UseMountTransitionProps) => {
   const [shouldRender, setShouldRender] = useState(isOpen)
-  const [isVisible, setIsVisible] = useState(false)
+  const [isVisible, setIsVisible] = useState(isOpen)
 
   useEffect(() => {
-    let timer: ReturnType<typeof setTimeout>
-    let frame: number
+    const timers: ReturnType<typeof setTimeout>[] = []
+    let frame: number | undefined
+
+    const later = (callback: () => void, delay: number) => {
+      const timer = setTimeout(callback, delay)
+      timers.push(timer)
+    }
 
     if (isOpen) {
-      // Сначала добавляем в DOM
-      setShouldRender(true)
+      callbackBeforeOpen?.()
 
-      // Ждем следующего кадра, чтобы браузер успел применить начальные стили (opacity: 0)
-      // перед тем, как мы включим анимацию
-      timer = setTimeout(() => {
-        // На этом этапе, благодаря задержке в 10ms, React уже
-        // отрисовал элемент и привязал ref
-        callbackBeforeClose && callbackBeforeClose()
+      later(() => {
+        setShouldRender(true)
 
         frame = requestAnimationFrame(() => {
           setIsVisible(true)
+          later(() => callbackAfterOpen?.(), transitionDuration)
         })
-
-        // Ждем завершения анимации, прежде чем вернуть скролл
-        timer = setTimeout(() => {
-          callbackAfterClose?.() // Ставим overflow auto после анимации
-        }, transitionDuration)
-      }, 10) // Небольшая задержка для стабильности в разных браузерах
+      }, 0)
     } else {
-      // Сначала запускаем анимацию исчезновения
-      setIsVisible(false)
+      callbackBeforeClose?.()
 
-      callbackBeforeOpen && callbackBeforeOpen()
+      frame = requestAnimationFrame(() => {
+        setIsVisible(false)
+      })
 
-      // Ждем окончания анимации и только потом удаляем из DOM
-      timer = setTimeout(() => {
+      later(() => {
         setShouldRender(false)
+        callbackAfterClose?.()
       }, transitionDuration)
-
-      callbackAfterOpen && callbackAfterOpen()
     }
 
     return () => {
-      clearTimeout(timer)
+      timers.forEach(clearTimeout)
       if (frame) cancelAnimationFrame(frame)
     }
-  }, [isOpen, transitionDuration])
+  }, [
+    isOpen,
+    transitionDuration,
+    callbackBeforeClose,
+    callbackAfterClose,
+    callbackBeforeOpen,
+    callbackAfterOpen,
+  ])
 
   return { shouldRender, isVisible }
 }

@@ -14,7 +14,7 @@ export const CheckBox: React.FC<CheckBoxProps> = ({
 }) => {
   return (
     <label
-      className={`custom-checkbox text-center space-x-1 flex items-center cursor-pointer ${className}`}
+      className={`custom-checkbox relative flex min-w-0 cursor-pointer items-start gap-2 text-left ${className ?? ""}`}
     >
       <input
         type="checkbox"
@@ -25,7 +25,11 @@ export const CheckBox: React.FC<CheckBoxProps> = ({
         {...props}
       />
       <span className={`custom-checkbox__checkmark ${styles.checkmark}`}></span>
-      {children && <span className="custom-checkbox__label">{children}</span>}
+      {children && (
+        <span className="custom-checkbox__label min-w-0 break-words">
+          {children}
+        </span>
+      )}
     </label>
   )
 }

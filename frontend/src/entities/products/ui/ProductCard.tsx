@@ -45,7 +45,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const queryClient = useQueryClient()
   const [message, setMessage] = useState<{
     text: string
-    type: "cart" | "fav"
+    type: "cart" | "fav" | "error"
   } | null>(null)
 
   const toggleAuthWindow = useAuthWindowStore((s) => s.toggle)
@@ -71,6 +71,15 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       ? Math.round(((oldPrice - currentPrice) / oldPrice) * 100)
       : 0
 
+  const formatPrice = (value: number) =>
+    value.toLocaleString("ru-RU", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })
+
+  const firstError = (value?: string | string[]) =>
+    Array.isArray(value) ? value[0] : value
+
   const handleActionWithAuth = (action: () => void) => {
     if (isProfileLoading) return
     if (!userIsAuthenticated) {
@@ -86,7 +95,19 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       addToCart(
         { product_variant_id: product.variant_id, quantity: 1 },
         {
-          onSuccess: () => {
+          onSuccess: (result) => {
+            if (!result.success) {
+              setMessage({
+                text:
+                  firstError(result.error?.data.error) ||
+                  firstError(result.error?.data.detail) ||
+                  "Не удалось добавить товар в корзину",
+                type: "error",
+              })
+              setTimeout(() => setMessage(null), 3000)
+              return
+            }
+
             setMessage({ text: "Добавлено в корзину", type: "cart" })
             queryClient.invalidateQueries({ queryKey: ["cart"] })
             setTimeout(() => setMessage(null), 2000)
@@ -99,7 +120,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   const handleToggleFavorite = () => {
     handleActionWithAuth(() => {
       if (isFavorite) {
-        removeFromFavorites(product.id, {
+        removeFromFavorites(product.variant_id || product.id, {
           onSuccess: () => {
             setMessage({ text: "Удалено", type: "fav" })
             queryClient.invalidateQueries({ queryKey: ["favorites"] })
@@ -124,7 +145,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
   return (
     <article
       className={clsx(
-        "group relative flex flex-col w-full h-full bg-white rounded-xl sm:rounded-2xl border border-slate-100",
+        "group relative flex min-w-0 flex-col w-full h-full bg-white rounded-xl sm:rounded-2xl border border-slate-100",
         "hover:shadow-xl hover:shadow-slate-200/50 transition-all duration-300 overflow-hidden",
         className,
       )}
@@ -164,14 +185,14 @@ export const ProductCard: React.FC<ProductCardProps> = ({
       </button>
 
       {/* Контент */}
-      <div className="flex flex-col flex-1 p-2.5 sm:p-4">
-        <div className="flex items-baseline gap-1.5 mb-1">
-          <span className="text-base sm:text-lg font-bold text-slate-900 whitespace-nowrap">
-            {currentPrice.toLocaleString("ru-RU")} ₽
+      <div className="flex min-w-0 flex-1 flex-col p-2.5 sm:p-4">
+        <div className="mb-1 flex flex-wrap items-baseline gap-x-1.5 gap-y-0.5">
+          <span className="text-sm font-bold text-slate-900 min-[380px]:text-base sm:text-lg">
+            {formatPrice(currentPrice)} ₽
           </span>
           {oldPrice && oldPrice > currentPrice && (
-            <span className="text-[10px] sm:text-xs text-slate-400 line-through whitespace-nowrap">
-              {oldPrice.toLocaleString("ru-RU")} ₽
+            <span className="text-[10px] text-slate-400 line-through sm:text-xs">
+              {formatPrice(oldPrice)} ₽
             </span>
           )}
         </div>
@@ -188,16 +209,16 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           </p>
         )}
 
-        <div className="mt-auto pt-2 flex items-center justify-between gap-2 mb-3">
+        <div className="mt-auto mb-3 flex flex-col items-start gap-2 pt-2 min-[380px]:flex-row min-[380px]:items-center min-[380px]:justify-between">
           <div className="flex items-center gap-0.5 text-yellow-400 shrink-0">
             <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20">
               <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
             </svg>
             <span className="text-[10px] sm:text-xs font-semibold text-slate-500">
-              {product.rating ?? "5.0"}
+              {product.rating ? Number(product.rating).toFixed(1) : "—"}
             </span>
           </div>
-          <span className="text-[9px] sm:text-[11px] text-slate-400 text-right font-medium truncate uppercase tracking-tighter">
+          <span className="w-full text-left text-[9px] font-medium uppercase tracking-tighter text-slate-400 min-[380px]:w-auto min-[380px]:truncate min-[380px]:text-right sm:text-[11px]">
             {product.stock && product.stock > 0
               ? `Остаток: ${product.stock}`
               : "Нет в наличии"}
@@ -208,7 +229,7 @@ export const ProductCard: React.FC<ProductCardProps> = ({
           onClick={handleAddToCart}
           disabled={isAddingToCart || !product.stock || product.stock <= 0}
           className={clsx(
-            "w-full py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-widest transition-all active:scale-[0.97]",
+            "w-full py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[10px] sm:text-xs font-bold uppercase tracking-[0.08em] sm:tracking-widest transition-all active:scale-[0.97]",
             !product.stock || product.stock <= 0
               ? "bg-slate-100 text-slate-400 cursor-not-allowed"
               : isAddingToCart
@@ -226,7 +247,12 @@ export const ProductCard: React.FC<ProductCardProps> = ({
 
       {/* Уведомление */}
       {message && (
-        <div className="absolute inset-x-2 bottom-16 bg-slate-900/90 text-white text-[10px] py-1.5 px-2 rounded-lg text-center backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 z-20">
+        <div
+          className={clsx(
+            "absolute inset-x-2 bottom-16 text-white text-[10px] py-1.5 px-2 rounded-lg text-center backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 z-20",
+            message.type === "error" ? "bg-red-600/95" : "bg-slate-900/90",
+          )}
+        >
           {message.text}
         </div>
       )}

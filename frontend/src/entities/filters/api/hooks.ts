@@ -1,4 +1,4 @@
-import { api, DefaultErrorResponse } from "@/shared/api"
+import { api } from "@/shared/api"
 import { FilterVariables, useBaseFilter } from "./useBaseFilter"
 import {
   CategoriesResponse,

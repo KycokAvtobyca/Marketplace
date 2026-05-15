@@ -5,6 +5,11 @@ import { useCreateShop } from "@/entities/user/api/useCreateShop"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Breadcrumbs } from "@/widgets/Breadcrumbs"
+import { isAxiosError } from "axios"
+
+interface ShopCreateError {
+  detail?: string
+}
 
 export default function CreateShopPage() {
   const router = useRouter()
@@ -12,6 +17,9 @@ export default function CreateShopPage() {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [success, setSuccess] = useState(false)
+  const errorMessage = isAxiosError<ShopCreateError>(error)
+    ? error.response?.data?.detail
+    : undefined
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
@@ -29,7 +37,7 @@ export default function CreateShopPage() {
   }
 
   return (
-    <main className="max-w-xl mx-auto p-4 sm:p-6">
+    <main className="mx-auto max-w-xl p-3 sm:p-6">
       <Breadcrumbs crumbs={[{ label: "Личный кабинет", href: "/profile" }, { label: "Создание магазина" }]} />
       <Link
         href="/profile"
@@ -40,7 +48,7 @@ export default function CreateShopPage() {
       <h1 className="text-2xl font-bold mb-6">Создание магазина</h1>
 
       {success ? (
-        <div className="p-6 bg-green-50 border border-green-200 rounded-2xl text-center">
+        <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-center sm:p-6">
           <p className="text-lg font-bold text-green-700 mb-2">
             Магазин успешно создан!
           </p>
@@ -51,7 +59,7 @@ export default function CreateShopPage() {
       ) : (
         <form
           onSubmit={handleSubmit}
-          className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm space-y-4"
+          className="space-y-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6"
         >
           <div>
             <label className="block text-sm font-medium text-slate-600 mb-1">
@@ -84,11 +92,11 @@ export default function CreateShopPage() {
 
           {error && (
             <p className="text-sm text-red-500">
-              {(error as any)?.response?.data?.detail || "Ошибка создания магазина"}
+              {errorMessage || "Ошибка создания магазина"}
             </p>
           )}
 
-          <div className="flex gap-3 pt-2">
+          <div className="flex flex-col gap-3 pt-2 min-[420px]:flex-row">
             <button
               type="button"
               onClick={() => router.back()}

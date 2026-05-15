@@ -3,7 +3,7 @@ export interface BaseProperties {
   slug: string
 }
 
-export interface FilterItem<T = any> extends BaseProperties {
+export interface FilterItem<T = BaseProperties> extends BaseProperties {
   children: T[]
 }
 
@@ -11,7 +11,9 @@ export interface FilterItem<T = any> extends BaseProperties {
  * Интерфейс отдельной категории.
  * Используется рекурсивно для поля children.
  */
-export interface Category extends FilterItem<Category> {}
+export interface Category extends BaseProperties {
+  children: Category[]
+}
 
 /**
  * Интерфейс ответа от API с пагинацией.
@@ -22,7 +24,9 @@ export interface CategoriesResponse extends Omit<Category, "slug"> {
   previous?: string
 }
 
-export interface ProductType extends FilterItem<ProductType> {}
+export interface ProductType extends BaseProperties {
+  children: ProductType[]
+}
 
 export interface ProductTypesResponse extends Omit<ProductType, "slug"> {
   prefix?: string
@@ -31,7 +35,8 @@ export interface ProductTypesResponse extends Omit<ProductType, "slug"> {
 }
 
 // Вложенные свойства meta ответа
-interface MetaProperiesNested<T> extends Omit<FilterItem<T>, "slug"> {
+interface MetaProperiesNested<T> extends Omit<BaseProperties, "slug"> {
+  children: T[]
   prefix: string
   next?: number
   previous?: number
@@ -57,7 +62,8 @@ interface AttributeValues extends Omit<BaseProperties, "slug"> {
 }
 
 // Интерфейс для Attributes со вложенными AttributeValues
-interface Attributes extends FilterItem<MetaProperiesNested<AttributeValues>> {
+interface Attributes extends BaseProperties {
+  children: MetaProperiesNested<AttributeValues>[]
   is_active: boolean
 }
 

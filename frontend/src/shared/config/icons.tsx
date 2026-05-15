@@ -10,14 +10,18 @@ import HeartGray from "@/shared/assets/icons/heart-gray.svg"
 import Cart from "@/shared/assets/icons/cart-brand.svg"
 import Trash from "@/shared/assets/icons/trash-brand.svg"
 import clsx from "clsx"
+import type { ComponentProps } from "react"
+
+type ArrowRightProps = ComponentProps<typeof ArrowRight>
+type ArrowDownProps = ComponentProps<typeof ArrowDownWithoutLine>
 
 export const ICON_REGISTRY = {
   ARROWRIGHT: ArrowRight,
-  ARROWLEFT: (props: any) => (
+  ARROWLEFT: (props: ArrowRightProps) => (
     <ArrowRight {...props} className={clsx(props?.className, "rotate-180")} />
   ),
   ARROWDOWN: ArrowDownWithoutLine,
-  ARROWUP: (props: any) => (
+  ARROWUP: (props: ArrowDownProps) => (
     <ArrowDownWithoutLine
       {...props}
       className={clsx(props?.className, "rotate-180")}

@@ -8,7 +8,7 @@ export interface UpdateProfileData {
   middle_name?: string
   email?: string
   address?: string
-  address_data?: Record<string, any>
+  address_data?: Record<string, unknown>
 }
 
 export const useUpdateProfile = () => {

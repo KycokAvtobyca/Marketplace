@@ -22,3 +22,27 @@ class ReviewImageAdmin(admin.ModelAdmin):
     list_display = ("id", "review", "image")
     search_fields = ("review__id", "review__user__name")
     readonly_fields = ("review",)
+
+
+@admin.register(models.ReviewVote)
+class ReviewVoteAdmin(admin.ModelAdmin):
+    list_display = ("id", "review", "user", "value", "date_time_create")
+    search_fields = ("review__id", "user__phone_number", "user__name")
+    list_filter = ("value", "date_time_create")
+    readonly_fields = ("date_time_create", "date_time_update")
+
+
+@admin.register(models.ProductQuestion)
+class ProductQuestionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "product",
+        "user",
+        "is_public",
+        "answered_by",
+        "answered_at",
+    )
+    search_fields = ("product__name", "user__phone_number", "text", "answer")
+    list_filter = ("is_public", "answered_at", "date_time_create")
+    readonly_fields = ("user", "date_time_create", "date_time_update", "answered_at")
+    autocomplete_fields = ("product",)

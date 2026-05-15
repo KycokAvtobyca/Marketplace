@@ -1,13 +1,13 @@
 @reference "../../../shared/styles/_tailwind.css";
 
 .form {
-  @apply grow flex max-w-md min-w-40 items-center shrink justify-center h-full;
+  @apply flex h-full min-w-0 w-full items-center;
   // @media (max-width: 398) {
   //   display: none;
   // }
 }
 
 .input {
-  @apply px-2 py-1 h-full w-full text-sm rounded-xl rounded-r-none focus:outline-none;
+  @apply h-full min-w-0 w-full rounded-xl rounded-r-none px-2 py-1 text-sm focus:outline-none;
   box-shadow: inset 0px 0px 5px -2px #06030c8a;
 }

@@ -1,3 +1,4 @@
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
 
@@ -12,7 +13,18 @@ class HttpOnlyJWTAuthentication(JWTAuthentication):
 
         try:
             validated_token = self.get_validated_token(raw_token)
-            return self.get_user(validated_token), validated_token
+            user = self.get_user(validated_token)
+            if not user.is_active:
+                raise AuthenticationFailed(
+                    {
+                        "message": "Ваш аккаунт заблокирован.",
+                        "code": "user_blocked",
+                    },
+                    code="user_blocked",
+                )
+            return user, validated_token
+        except AuthenticationFailed:
+            raise
         except Exception:
             # Если токен протух, DRF вернет 401
             return None

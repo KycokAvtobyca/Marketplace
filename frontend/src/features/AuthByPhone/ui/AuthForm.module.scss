@@ -1,7 +1,7 @@
 @reference "../../../shared/styles/_tailwind.css";
 
 .buttonAuth {
-  @apply whitespace-nowrap cursor-pointer transition-colors duration-300 bg-brand-main/80 rounded-sm px-4 py-2 text-default;
+  @apply w-full cursor-pointer rounded-xl bg-brand-main/80 px-4 py-2 text-center text-default transition-colors duration-300;
 
   &:disabled {
     @apply cursor-not-allowed bg-gray-400;
@@ -13,7 +13,7 @@
 }
 
 .buttonRepeatSMS {
-  @apply text-xs underline opacity-50 cursor-pointer;
+  @apply cursor-pointer text-center text-xs underline opacity-50;
 
   &:disabled {
     @apply cursor-not-allowed text-gray-400;

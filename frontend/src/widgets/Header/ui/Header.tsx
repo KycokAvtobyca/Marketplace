@@ -9,10 +9,10 @@ export const Header = () => {
   return (
     <header
       className="
-      flex h-[8vw] min-h-12 w-full max-w-5xl max-h-12 items-center flex-row justify-between
-      gap-[3vw] backdrop-blur-md rounded-xl sticky top-4 z-[35] p-2 py-1.5 bg-brand-main/5 border border-brand-main/10 shadow-sm"
+      sticky top-0 z-[35] flex min-h-12 w-full max-w-5xl flex-row items-center justify-between
+      gap-3 rounded-xl border border-brand-main/10 bg-brand-main/5 p-2 py-1.5 shadow-sm backdrop-blur-md"
     >
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <div className="hidden min-[450px]:block">
           <Logo />
         </div>
@@ -20,12 +20,12 @@ export const Header = () => {
       </div>
 
       {/* Поиск (занимает центральную часть) */}
-      <div className="flex-1 h-full max-w-xl">
+      <div className="h-10 min-w-0 flex-1">
         <SearchForm />
       </div>
 
       {/* Правый блок с навигацией (Избранное, Корзина, Профиль) */}
-      <nav className="flex items-center gap-1 sm:gap-2 shrink-0">
+      <nav className="flex shrink-0 items-center gap-1 sm:gap-2">
         <FavoritesButton className="w-7 h-7" />
         <CartButton className="w-7 h-7" />
 

@@ -10,6 +10,7 @@ from django.core.validators import (
     MinValueValidator,
 )
 from django.db import models, transaction
+from django.utils import timezone
 from django.utils.functional import cached_property
 
 
@@ -130,6 +131,89 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
             self.validate_purchase()
 
         super().save(*args, **kwargs)
+
+
+class ReviewVote(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Value(models.TextChoices):
+        USEFUL = "USEFUL", "Полезно"
+        UNUSEFUL = "UNUSEFUL", "Неполезно"
+
+    review = models.ForeignKey(
+        Review,
+        on_delete=models.CASCADE,
+        related_name="votes",
+        verbose_name="Отзыв",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="review_votes",
+        verbose_name="Пользователь",
+    )
+    value = models.CharField("Голос", max_length=10, choices=Value.choices)
+
+    class Meta:
+        verbose_name = "Голос за отзыв"
+        verbose_name_plural = "Голоса за отзывы"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["review", "user"],
+                name="unique_review_vote_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.user_id}: {self.value} for review {self.review_id}"
+
+
+class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
+    product = models.ForeignKey(
+        "catalog.Product",
+        on_delete=models.CASCADE,
+        related_name="questions",
+        verbose_name="Товар",
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="product_questions",
+        verbose_name="Автор вопроса",
+    )
+    text = models.TextField(
+        "Вопрос",
+        max_length=2000,
+        validators=[MinLengthValidator(5)],
+    )
+    answer = models.TextField("Ответ продавца", max_length=2000, blank=True)
+    answered_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="answered_product_questions",
+        verbose_name="Ответил",
+    )
+    answered_at = models.DateTimeField("Дата ответа", null=True, blank=True)
+    is_public = models.BooleanField("Показывать на сайте", default=True)
+
+    class Meta:
+        verbose_name = "Вопрос о товаре"
+        verbose_name_plural = "Вопросы о товарах"
+        ordering = ["-date_time_create", "-id"]
+        indexes = [
+            models.Index(fields=["product", "-date_time_create"]),
+            models.Index(fields=["is_public", "-date_time_create"]),
+        ]
+
+    def set_answer(self, user, answer):
+        self.answer = answer.strip()
+        self.answered_by = user
+        self.answered_at = timezone.now()
+        self.save(update_fields=["answer", "answered_by", "answered_at", "date_time_update"])
+
+    def __str__(self):
+        return f"Вопрос #{self.pk} к товару {self.product_id}"
 
 
 class ReviewImage(models.Model):

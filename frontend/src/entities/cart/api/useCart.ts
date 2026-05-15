@@ -16,6 +16,7 @@ interface CartResponse {
       id: number
       sku: string
       product_name: string
+      product_id: number
       product_slug: string
       brand: string | null
       price: number
@@ -29,14 +30,17 @@ interface CartResponse {
   total_items_price: number
   total_cost: number
   promocode: number | null
+  promocode_code?: string | null
+  promocode_discount?: string
 }
 
 interface CartApiAction {
   success: boolean
   error?: {
     data: {
-      detail?: string
-      error?: string
+      detail?: string | string[]
+      error?: string | string[]
+      promocode?: string | string[]
     }
   }
   data?: CartResponse
@@ -113,7 +117,7 @@ export const useRemoveFromCart = () => {
           success: true,
           data: response.data.cart,
         }
-      } catch (error) {
+      } catch {
         // ... твой код обработки ошибок остается таким же ...
         return { success: false, error: { data: { detail: "Ошибка" } } }
       }
@@ -169,11 +173,90 @@ export const useUpdateCartItemQuantity = () => {
   })
 }
 
-export const useClearCart = () => {
+export const useApplyPromocode = () => {
+  return useMutation({
+    mutationFn: async (code: string): Promise<CartApiAction> => {
+      try {
+        const response = await api.post<{
+          message: string
+          cart: CartResponse
+        }>(ROUTES.CART.APPLY_PROMOCODE, { code })
+
+        return {
+          success: true,
+          data: response.data.cart,
+        }
+      } catch (error) {
+        if (isAxiosError(error)) {
+          return {
+            success: false,
+            error: {
+              data: error.response?.data as {
+                detail?: string
+                error?: string
+                promocode?: string
+              },
+            },
+          }
+        }
+
+        return {
+          success: false,
+          error: {
+            data: {
+              detail: "Не удалось применить промокод",
+            },
+          },
+        }
+      }
+    },
+  })
+}
+
+export const useRemovePromocode = () => {
   return useMutation({
     mutationFn: async (): Promise<CartApiAction> => {
       try {
         const response = await api.delete<{
+          message: string
+          cart: CartResponse
+        }>(ROUTES.CART.REMOVE_PROMOCODE)
+
+        return {
+          success: true,
+          data: response.data.cart,
+        }
+      } catch (error) {
+        if (isAxiosError(error)) {
+          return {
+            success: false,
+            error: {
+              data: error.response?.data as {
+                detail?: string
+                error?: string
+              },
+            },
+          }
+        }
+
+        return {
+          success: false,
+          error: {
+            data: {
+              detail: "Не удалось удалить промокод",
+            },
+          },
+        }
+      }
+    },
+  })
+}
+
+export const useClearCart = () => {
+  return useMutation({
+    mutationFn: async (): Promise<CartApiAction> => {
+      try {
+        await api.delete<{
           message: string
         }>(ROUTES.CART.CLEAR)
 

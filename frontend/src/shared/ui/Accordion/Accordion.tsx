@@ -1,6 +1,6 @@
 "use client"
 
-import { ReactNode, MouseEvent, useState, useRef } from "react"
+import { ReactNode, useState, useRef } from "react"
 import { Icon } from "../Icons"
 import { useMountTransition } from "@/shared/lib/hooks"
 import clsx from "clsx"
@@ -120,7 +120,7 @@ export const Accordion: React.FC<Accordion> = ({
   }
 
   return (
-    <>
+    <div className={classNameDiv}>
       {items.map((item, index) => (
         <AccordionItem
           key={index}
@@ -131,6 +131,6 @@ export const Accordion: React.FC<Accordion> = ({
           classNameAccordionItemOuterDiv={classNameAccordionItemOuterDiv}
         />
       ))}
-    </>
+    </div>
   )
 }

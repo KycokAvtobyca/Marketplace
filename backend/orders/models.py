@@ -25,11 +25,11 @@ def get_default_valid_to():
 # В Заказе: total_cost — это поле в БД (DecimalField).
 class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     class Status(models.TextChoices):
-        CREATED = "CREATED", "Создан (Не оплачен)"
-        PAID = "PAID", "Оплачен (В обработке)"
+        CREATED = "CREATED", "Оформлен"
         ASSEMBLING = "ASSEMBLING", "Собирается"
-        DELIVERING = "DELIVERING", "В пути / Готов к выдаче"
-        COMPLETED = "COMPLETED", "Выполнен"
+        DELIVERING = "DELIVERING", "В пути / готов к выдаче"
+        COMPLETED = "COMPLETED", "Получен, ожидает оплаты"
+        PAID = "PAID", "Оплачен после получения"
         CANCELED = "CANCELED", "Отменен"
 
     class DeliveryType(models.TextChoices):

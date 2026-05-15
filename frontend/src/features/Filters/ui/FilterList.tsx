@@ -7,50 +7,61 @@ import {
 import clsx from "clsx"
 import { CheckBox } from "@/shared/ui/CheckBox"
 
-// Хелпер для извлечения массива данных
-const getChildrenArray = (obj: any): any[] => {
-  if (!obj?.children) return []
+interface FilterNode extends BaseProperties {
+  id?: number | string
+  children?:
+    | FilterNode[]
+    | {
+        children?: FilterNode[]
+        results?: FilterNode[]
+      }
+}
 
-  // Если это массив (Категории)
+const getChildrenArray = (obj: FilterNode): FilterNode[] => {
+  if (!obj.children) return []
+
   if (Array.isArray(obj.children)) {
     return obj.children
   }
 
-  // Если это объект пагинации (Атрибуты), достаем вложенный массив
-  // Проверяем оба варианта ключей: 'children' или 'results'
   return obj.children.children || obj.children.results || []
 }
 
-// Обновленный hasChildren
-const hasChildren = (obj: any): boolean => {
+const hasChildren = (obj: FilterNode): boolean => {
   return getChildrenArray(obj).length > 0
 }
 
-// Написать onchange для чекбокса, который будет обновлять состояние выбранных фильтров в родительском компоненте (например, через контекст или пропсы).
-// Это позволит сохранять выбранные фильтры при открытии/закрытии аккордеона и при навигации по сайту.
+const sortChildrenFirst = (items: FilterNode[]): FilterNode[] => {
+  return [...items].sort((a, b) => {
+    const aHasChildren = hasChildren(a)
+    const bHasChildren = hasChildren(b)
 
-const FilterLeaf = ({ object, path }: { object: any; path?: string }) => {
+    if (aHasChildren !== bHasChildren) {
+      return aHasChildren ? -1 : 1
+    }
+
+    return a.name.localeCompare(b.name, "ru")
+  })
+}
+
+const FilterLeaf = ({ object, path }: { object: FilterNode; path?: string }) => {
   const toggleFilter = useFilterModalMenuStore((s) => s.toggleFilter)
 
-  // Достаем slug или id (так как у атрибутов в JSON используется id)
   const itemValue = object.slug || object.id?.toString()
-  const fullName = path ? `${path}__${itemValue}` : itemValue
+  const fullName = itemValue ? (path ? `${path}__${itemValue}` : itemValue) : ""
 
-  // Проверяем, выбран ли текущий чекбокс
   const isChecked = useFilterModalMenuStore((s) =>
     s.selectedFilters.includes(fullName),
   )
 
-  const handleChange = () => {
-    toggleFilter(fullName)
-  }
+  if (!itemValue) return null
 
   return (
     <div className="py-0.5">
       <CheckBox
         name={fullName}
-        checked={isChecked} // Связываем со стором
-        onChange={handleChange} // Обработчик клика
+        checked={isChecked}
+        onChange={() => toggleFilter(fullName)}
         className="text-xs sm:text-sm py-1"
       >
         {object.name}
@@ -60,7 +71,7 @@ const FilterLeaf = ({ object, path }: { object: any; path?: string }) => {
 }
 
 interface FilterListProps {
-  object?: FilterItem
+  object?: FilterItem | FilterNode
   title?: string
   hasParent?: boolean
   isLastChild?: boolean
@@ -79,11 +90,10 @@ export const FilterList: React.FC<FilterListProps> = ({
   if (!object) return null
 
   const children = getChildrenArray(object)
-  // Храним корневой путь группы фильтров (например: categories, product_types, material)
   const currentPath = parentPath || object.slug
 
   const renderContent = () => {
-    return children.map((child: any, idx: number) => {
+    return sortChildrenFirst(children).map((child, idx) => {
       if (hasChildren(child)) {
         return (
           <FilterList
@@ -96,7 +106,6 @@ export const FilterList: React.FC<FilterListProps> = ({
         )
       }
 
-      // Используем новый компонент вместо вызова функции
       return (
         <FilterLeaf
           key={child.slug || child.id || idx}

@@ -7,6 +7,8 @@ urlpatterns = [
     path("cart/", include("carts.urls")),
     path("favorites/", include("favorites.urls")),
     path("orders/", include("orders.urls")),
+    path("marketing/", include("marketing.urls")),
+    path("reviews/", include("reviews.urls")),
     # Admin integration
     path("admin-redirect/", views.admin_redirect, name="admin_redirect"),
     path("check-admin-access/", views.check_admin_access, name="check_admin_access"),

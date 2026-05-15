@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/shared/api"
 import { ROUTES } from "@/shared/config"
 
@@ -23,7 +23,7 @@ export interface Order {
   branch: string | null
   branch_display: string | null
   address: string | null
-  address_data: Record<string, any> | null
+  address_data: Record<string, unknown> | null
   name: string
   phone_number: string
   description: string
@@ -44,5 +44,19 @@ export const useOrders = () => {
     staleTime: 1000 * 60 * 5, // 5 минут
     refetchOnWindowFocus: true,
     retry: 1,
+  })
+}
+
+export const useCancelOrder = () => {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: number): Promise<Order> => {
+      const { data } = await api.post(ROUTES.ORDERS.CANCEL(id))
+      return data
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["orders"] })
+    },
   })
 }

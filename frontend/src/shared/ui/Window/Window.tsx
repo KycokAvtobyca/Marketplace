@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React from "react"
 import styles from "./Window.module.scss"
 import { Overlay } from "./Overlay"
 import { clsx } from "clsx"

@@ -32,26 +32,51 @@ export const CategoryBreadcrumbs = () => {
     searchParams?.get("categories")?.trim() ||
     searchParams?.get("category")?.trim() ||
     ""
-
-  const { data } = useCategories({ cursor: "" })
-  const categories = data?.data?.categories?.children || []
-
-  const category = useMemo(
-    () => findCategoryBySlug(categories, slug),
-    [categories, slug],
+  const search = searchParams?.get("search")?.trim() || ""
+  const hasFilters = Array.from(searchParams?.keys() || []).some((key) =>
+    [
+      "brands",
+      "shops",
+      "product_types",
+      "price_min",
+      "price_max",
+      "material",
+      "razmer",
+    ].includes(key),
   )
 
-  if (!slug) {
+  const { data } = useCategories({ cursor: "" })
+
+  const category = useMemo(
+    () => findCategoryBySlug(data?.data?.categories?.children || [], slug),
+    [data, slug],
+  )
+
+  if (!slug && !search && !hasFilters) {
     return null
   }
 
+  const crumbs = []
+
+  if (slug) {
+    crumbs.push({
+      label: category?.name || decodeURIComponent(slug),
+      href: search || hasFilters ? `/catalog?categories=${slug}` : undefined,
+    })
+  }
+
+  if (search) {
+    crumbs.push({
+      label: `Поиск: ${search}`,
+      href: hasFilters ? `/catalog?search=${encodeURIComponent(search)}` : undefined,
+    })
+  }
+
+  if (hasFilters) {
+    crumbs.push({ label: "Фильтры" })
+  }
+
   return (
-    <Breadcrumbs
-      crumbs={[
-        {
-          label: category?.name || decodeURIComponent(slug),
-        },
-      ]}
-    />
+    <Breadcrumbs crumbs={crumbs} />
   )
 }

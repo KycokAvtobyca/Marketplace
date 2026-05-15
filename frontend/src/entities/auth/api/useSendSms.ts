@@ -6,7 +6,7 @@ import {
   useAuthStore,
 } from "@/entities/auth"
 import { api } from "@/shared/api"
-import { AxiosResponse, isAxiosError } from "axios"
+import { isAxiosError } from "axios"
 import { ROUTES } from "@/shared/config"
 
 export const useSendSms = () => {

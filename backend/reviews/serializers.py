@@ -1,0 +1,140 @@
+from django.core.exceptions import ValidationError as DjangoValidationError
+from rest_framework import serializers
+
+from .models import ProductQuestion, Review, ReviewImage
+
+
+class ReviewImageSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ReviewImage
+        fields = ["id", "image"]
+
+    def get_image(self, obj):
+        request = self.context.get("request")
+        if request:
+            return request.build_absolute_uri(obj.image.url)
+        return obj.image.url
+
+
+class ReviewSerializer(serializers.ModelSerializer):
+    images = ReviewImageSerializer(source="review_images", many=True, read_only=True)
+    author_name = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    current_user_vote = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Review
+        fields = [
+            "id",
+            "product_variant",
+            "rating",
+            "description",
+            "status",
+            "is_verified_purchase",
+            "useful_count",
+            "unuseful_count",
+            "author_name",
+            "user_id",
+            "current_user_vote",
+            "date_time_create",
+            "date_time_update",
+            "images",
+        ]
+        read_only_fields = [
+            "id",
+            "status",
+            "is_verified_purchase",
+            "useful_count",
+            "unuseful_count",
+            "author_name",
+            "user_id",
+            "current_user_vote",
+            "date_time_create",
+            "date_time_update",
+            "images",
+        ]
+
+    def get_author_name(self, obj):
+        if not obj.user:
+            return "Пользователь"
+        return obj.user.name or "Пользователь"
+
+    def get_current_user_vote(self, obj):
+        request = self.context.get("request")
+        if not request or not request.user or not request.user.is_authenticated:
+            return None
+        existing_vote = obj.votes.filter(user=request.user).first()
+        return existing_vote.value if existing_vote else None
+
+    def validate(self, attrs):
+        if self.instance and "product_variant" in attrs:
+            if attrs["product_variant"].pk != self.instance.product_variant_id:
+                raise serializers.ValidationError(
+                    {"product_variant": "Нельзя перенести отзыв на другой товар."}
+                )
+        return attrs
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        review = Review(user=request.user, **validated_data)
+        try:
+            review.full_clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+            ) from exc
+        review.save()
+        return review
+
+
+class ProductQuestionSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    user_id = serializers.IntegerField(source="user.id", read_only=True)
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    answered_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductQuestion
+        fields = [
+            "id",
+            "product",
+            "product_name",
+            "text",
+            "answer",
+            "author_name",
+            "user_id",
+            "answered_by_name",
+            "answered_at",
+            "is_public",
+            "date_time_create",
+            "date_time_update",
+        ]
+        read_only_fields = [
+            "id",
+            "answer",
+            "author_name",
+            "user_id",
+            "product_name",
+            "answered_by_name",
+            "answered_at",
+            "is_public",
+            "date_time_create",
+            "date_time_update",
+        ]
+
+    def get_author_name(self, obj):
+        if not obj.user:
+            return "Пользователь"
+        return obj.user.name or "Пользователь"
+
+    def get_answered_by_name(self, obj):
+        if not obj.answered_by:
+            return ""
+        shop = obj.product.shop
+        return shop.name if shop else obj.answered_by.name or "Продавец"
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        return ProductQuestion.objects.create(user=request.user, **validated_data)

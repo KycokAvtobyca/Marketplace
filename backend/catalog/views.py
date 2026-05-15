@@ -2,6 +2,8 @@ from decimal import Decimal, InvalidOperation
 
 from django.db.models import (
     Avg,
+    Count,
+    F,
     Max,
     Min,
     OuterRef,
@@ -19,22 +21,49 @@ from catalog import models as m
 from catalog.mixins import CategoryTreeOptimizerMixin
 
 from . import serializers as s
-from .pagination import DefaultCursorPagination, FilterValuesPagination
+from .pagination import (
+    DefaultCursorPagination,
+    FilterValuesPagination,
+    ProductCatalogPagination,
+)
 from .utils import get_limited_data, prefetch_tree_data
 
 
 class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = s.ProductCatalogSerializer
-    pagination_class = DefaultCursorPagination
+    pagination_class = ProductCatalogPagination
+
+    @staticmethod
+    def category_ids_for_slugs(slugs):
+        clean_slugs = [slug for slug in slugs if slug and slug != "/"]
+        if not clean_slugs:
+            return []
+
+        ids = set()
+        categories = m.Category.objects.filter(slug__in=clean_slugs)
+        for category in categories:
+            ids.update(
+                category.get_descendants(include_self=True).values_list(
+                    "id", flat=True
+                )
+            )
+        return list(ids)
 
     def get_queryset(self):
         user = self.request.user
         queryset = m.Product.objects.filter(shop__is_active=True)
 
+        category_values = []
+        for key in ("categories", "categories[]", "category"):
+            category_values.extend(self.request.query_params.getlist(key))
+
+        category_ids = self.category_ids_for_slugs(category_values)
+        if category_ids:
+            queryset = queryset.filter(category_id__in=category_ids)
+
         # --- ДИНАМИЧЕСКАЯ ФИЛЬТРАЦИЯ ---
         filter_map = {
             # Категории (odezhda, obuv и т.д. на фронте приходят как отдельные ключи)
-            "categories": "category__slug__in",
             "odezhda": "category__slug__in",
             "obuv": "category__slug__in",
             # Бренды и Магазины
@@ -50,6 +79,9 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
         # Проходим по всем параметрам в URL
         for param_key in self.request.query_params:
             clean_key = param_key.replace("[]", "")
+
+            if clean_key in ("categories", "category"):
+                continue
 
             if clean_key in filter_map:
                 values = self.request.query_params.getlist(param_key)
@@ -71,7 +103,9 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                     variants__in=m.ProductVariant.objects.with_prices(
                         user=user
                     ).filter(
-                        is_active=True, discounted_price__gte=min_price_decimal
+                        is_active=True,
+                        stock__gt=0,
+                        discounted_price__gte=min_price_decimal,
                     )
                 )
             except (InvalidOperation, ValueError):
@@ -84,7 +118,9 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
                     variants__in=m.ProductVariant.objects.with_prices(
                         user=user
                     ).filter(
-                        is_active=True, discounted_price__lte=max_price_decimal
+                        is_active=True,
+                        stock__gt=0,
+                        discounted_price__lte=max_price_decimal,
                     )
                 )
             except (InvalidOperation, ValueError):
@@ -102,35 +138,55 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
 
         # --- ЛОГИКА ПОДЗАПРОСОВ ---
         variants_with_prices = m.ProductVariant.objects.filter(
-            product=OuterRef("pk"), is_active=True
+            product=OuterRef("pk"), is_active=True, stock__gt=0
         ).with_prices(user=user)
 
         main_image_sq = m.ProductImage.objects.filter(
-            variant__product=OuterRef("pk"), is_main=True
-        ).values("image")
+            variant__product=OuterRef("pk"),
+            variant__is_active=True,
+            variant__stock__gt=0,
+        ).order_by("-variant__is_main", "-variant__stock", "-is_main", "variant_id", "pk").values("image")
 
         sku_sq = (
             m.ProductVariant.objects.filter(
-                product=OuterRef("pk"), is_active=True
+                product=OuterRef("pk"), is_active=True, stock__gt=0
             )
-            .order_by("-is_main", "pk")
+            .order_by("-is_main", "-stock", "pk")
             .values("sku")[:1]
+        )
+        variant_id_sq = (
+            m.ProductVariant.objects.filter(
+                product=OuterRef("pk"), is_active=True, stock__gt=0
+            )
+            .order_by("-is_main", "-stock", "pk")
+            .values("id")[:1]
         )
 
         from django.db.models import Case, IntegerField, When
 
-        return (
+        queryset = (
             queryset.annotate(
                 api_price=Subquery(
-                    variants_with_prices.order_by("discounted_price").values(
+                    variants_with_prices.order_by("-is_main", "-stock", "pk").values(
                         "discounted_price"
                     )[:1]
                 ),
-                api_old_price=Min("variants__price"),
+                api_old_price=Subquery(
+                    variants_with_prices.order_by("-is_main", "-stock", "pk").values(
+                        "price"
+                    )[:1]
+                ),
                 api_image=Subquery(main_image_sq[:1]),
                 api_sku=Subquery(sku_sq),
-                api_rating=Avg("variants__reviews__rating"),
-                api_stock=Sum("variants__stock"),
+                api_variant_id=Subquery(variant_id_sq),
+                api_rating=Avg(
+                    "variants__reviews__rating",
+                    filter=Q(variants__reviews__status="APPROVED"),
+                ),
+                api_stock=Sum(
+                    "variants__stock",
+                    filter=Q(variants__is_active=True, variants__stock__gt=0),
+                ),
                 # Явное значение для сортировки:
                 # товары с наличием = 1, без наличия = 0
                 has_stock=Case(
@@ -141,8 +197,28 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             )
             .select_related("brand", "shop")
             .distinct()
-            .order_by("-has_stock", "-api_stock")
         )
+        queryset = queryset.filter(api_variant_id__isnull=False)
+
+        sort = self.request.query_params.get("sort", "new")
+        sort_map = {
+            "price_asc": ("-has_stock", "api_price", "id"),
+            "price_desc": ("-has_stock", "-api_price", "-id"),
+            "new": ("-has_stock", "-date_time_create", "-id"),
+            "popular": (
+                "-has_stock",
+                F("api_rating").desc(nulls_last=True),
+                "-views",
+                "-id",
+            ),
+            "views_desc": ("-has_stock", "-views", "-id"),
+            "rating_desc": (
+                "-has_stock",
+                F("api_rating").desc(nulls_last=True),
+                "-id",
+            ),
+        }
+        return queryset.order_by(*sort_map.get(sort, sort_map["new"]))
 
 
 class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
@@ -199,6 +275,13 @@ class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
             }
         )
         return context
+
+    def retrieve(self, request, *args, **kwargs):
+        response = super().retrieve(request, *args, **kwargs)
+        m.Product.objects.filter(pk=self.kwargs.get(self.lookup_field)).update(
+            views=F("views") + 1
+        )
+        return response
 
 
 class CategoryViewSet(
@@ -326,7 +409,11 @@ class FiltersViewSet(viewsets.ViewSet):
 
     def _get_custom_categories(self, request):
         # Запрос всё еще ленивый, в базу не идет
-        queryset = m.Category.objects.filter(level=0)
+        queryset = (
+            m.Category.objects.filter(level=0)
+            .annotate(children_count=Count("children"))
+            .order_by("-children_count", "tree_id", "lft", "name")
+        )
 
         # Описываем логику префетча для конкретного кусочка данных
         def prepare_categories(instances, context):
@@ -352,7 +439,10 @@ class FiltersViewSet(viewsets.ViewSet):
 
         if categories and categories[0] != "/":
             # Используем distinct только если есть фильтрация, чтобы не грузить БД
-            qs = qs.filter(products__category__slug__in=categories).distinct()
+            category_ids = ProductCatalogViewSet.category_ids_for_slugs(
+                categories
+            )
+            qs = qs.filter(products__category_id__in=category_ids).distinct()
 
         return get_limited_data(
             request,
@@ -360,6 +450,7 @@ class FiltersViewSet(viewsets.ViewSet):
             s.ProductTypeSerializer,
             prefix="product_tag",
             name="Тип товара",
+            limit=1000,
         )
 
     # ------
@@ -371,8 +462,11 @@ class FiltersViewSet(viewsets.ViewSet):
         # Фильтрация QuerySet продуктов
         product_qs = m.Product.objects.all()
         if categories and categories[0] != "/":
+            category_ids = ProductCatalogViewSet.category_ids_for_slugs(
+                categories
+            )
             product_qs = product_qs.filter(
-                category__slug__in=categories
+                category_id__in=category_ids
             ).distinct()
             if types and types[0] != "/":
                 product_qs = product_qs.filter(

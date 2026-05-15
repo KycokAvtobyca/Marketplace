@@ -6,7 +6,7 @@ import {
   MetaResponse,
 } from "@/entities/filters/model/types"
 
-import { ReactNode, useEffect, useState } from "react"
+import { ReactNode, useState } from "react"
 import React from "react"
 import { FilterList } from "./FilterList"
 import { FilterItem } from "@/entities/filters"
@@ -18,20 +18,13 @@ interface FilterGroupListProps {
 export const FilterGroupList: React.FC<FilterGroupListProps> = ({
   isSidebar = false,
 }) => {
-  const [filterVars, setFilterVars] = useState({ startPages: [] })
+  const [filterVars] = useState({ startPages: [] })
 
   const {
     data: response,
     isLoading,
     isError,
-    error,
   } = useFilterProperties(filterVars)
-
-  useEffect(() => {
-    if (response?.data) {
-      console.log("Данные получены:", response?.data)
-    }
-  }, [response])
 
   if (isLoading) return <div>Загрузка фильтров...</div>
   if (isError || !response) return <div>Ошибка при загрузке фильтров.</div>
@@ -43,7 +36,7 @@ export const FilterGroupList: React.FC<FilterGroupListProps> = ({
   const groupingComponents = (
     lists: Omit<FilterPropertiesResponse, "meta"> | MetaResponse,
   ): ReactNode => {
-    return Object.entries(lists).map(([objectKey, value], index) => {
+    return Object.entries(lists).map(([objectKey, value]) => {
       if (!value?.children || value.children.length === 0) return
 
       // Создаем групповой объект

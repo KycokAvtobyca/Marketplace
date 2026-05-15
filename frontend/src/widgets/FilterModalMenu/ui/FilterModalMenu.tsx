@@ -38,7 +38,7 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
     setPriceMax("")
     setAppliedQueryString("")
 
-    const preservedSearch = searchParams.get("search")?.trim()
+    const preservedSearch = searchParams?.get("search")?.trim()
     const params = new URLSearchParams()
     if (preservedSearch) params.set("search", preservedSearch)
 
@@ -56,7 +56,7 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
     const params = getApiParams(selectedFilters)
     const searchParamsForUrl = new URLSearchParams()
 
-    const preservedSearch = searchParams.get("search")?.trim()
+    const preservedSearch = searchParams?.get("search")?.trim()
     if (preservedSearch) {
       searchParamsForUrl.set("search", preservedSearch)
     }
@@ -96,9 +96,9 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
         isOpen={isFilterModalMenu}
         toggleModalMenu={toggleFilterModalMenu}
       >
-        <div className="mx-auto w-full max-w-5xl px-2">
+        <div className="mx-auto w-full max-w-5xl px-1 sm:px-2">
           {/* ВЕСЬ КОНТЕНТ ДОЛЖЕН БЫТЬ ВНУТРИ ЭТОГО DIV */}
-          <div className="flex flex-col">
+          <div className="flex max-h-[calc(100dvh-5rem)] flex-col">
             {/* 1. Шапка (Фиксированная) */}
             <div className="flex items-center justify-between mb-6 px-1 shrink-0">
               <h2 className="text-2xl font-bold text-slate-800">Фильтры</h2>
@@ -114,7 +114,7 @@ export const FilterModalMenu: React.FC<FilterModalMenuProps> = ({
             </div>
 
             {/* 2. Список (С прокруткой) */}
-            <div className="overflow-y-auto pr-2 custom-scrollbar">
+            <div className="custom-scrollbar min-h-0 overflow-y-auto pr-2">
               <PriceRangeFilter
                 onChange={(min, max) => {
                   setPriceMin(min)

@@ -90,8 +90,8 @@ class SingleMainMixin(models.Model):
 
         # После Mutex делаем синхронизацию с бд
         # только если объект уже существует в базе
-        if not self._state.adding:
-            self.refresh_from_db()
+        # if not self._state.adding:
+        #     self.refresh_from_db()  # Убираем, чтобы не перезаписывать изменения в памяти
 
         if self.is_main:
             # Если текущий вариант становится главным, жестко снимаем флаг с остальных

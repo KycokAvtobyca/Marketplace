@@ -3,6 +3,7 @@ from common.mixins import (
     DateTimeUpdateMixin,
     SlugifiedNameMixin,
 )
+from common.phone import validate_ru_mobile_phone
 from common.utils import UploadPath
 from django.conf import settings
 from django.contrib.auth.models import (
@@ -21,7 +22,7 @@ class CustomUserManager(BaseUserManager):
         if not phone_number:
             raise ValueError("Номер телефона обязателен")
 
-        user = self.model(phone_number=phone_number, **extra_fields)
+        user = self.model(phone_number=validate_ru_mobile_phone(phone_number), **extra_fields)
 
         if password:
             user.set_password(password)
@@ -124,12 +125,13 @@ class CustomUser(
         from orders.models import Order, OrderItem
 
         return OrderItem.objects.filter(
-            order__user_id=self.user.id,
+            order__user_id=self.id,
             product_variant_id=variant.pk,
             order__status=Order.Status.COMPLETED,
         ).exists()
 
     def save(self, *args, **kwargs):
+        self.phone_number = validate_ru_mobile_phone(self.phone_number)
         self.email = (self.email or "").strip().lower() or None
 
         super().save(*args, **kwargs)

@@ -316,9 +316,37 @@ class ProductVariant(SingleMainMixin):
                         "Не удалось сгенерировать уникальный SKU"
                     )
 
+                self.sync_main_for_product(self.product_id)
                 return
 
             super().save(*args, **kwargs)
+            self.sync_main_for_product(self.product_id)
+
+    @classmethod
+    def sync_main_for_product(cls, product_id):
+        if not product_id:
+            return
+
+        if cls.objects.filter(
+            product_id=product_id,
+            is_main=True,
+            is_active=True,
+            stock__gt=0,
+        ).exists():
+            return
+
+        next_main = (
+            cls.objects.filter(product_id=product_id, is_active=True, stock__gt=0)
+            .order_by("-stock", "pk")
+            .first()
+        )
+        if not next_main:
+            return
+
+        cls.objects.filter(product_id=product_id).exclude(pk=next_main.pk).update(
+            is_main=False
+        )
+        cls.objects.filter(pk=next_main.pk).update(is_main=True)
 
 
 # Отдельная модель изображений

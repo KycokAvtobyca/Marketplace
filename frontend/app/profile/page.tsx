@@ -7,20 +7,23 @@ import { usePhoneChange } from "@/entities/user/api/usePhoneChange"
 import { useMyShop } from "@/entities/user/api/useMyShop"
 import { useCheckAdminAccess, useRedirectToAdmin } from "@/entities/user"
 import { useOrders } from "@/entities/orders/api/useOrders"
-import { Icon } from "@/shared/ui/Icons/Icon"
+import { useCancelOrder } from "@/entities/orders/api/useCancelOrder"
+import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { Breadcrumbs } from "@/widgets/Breadcrumbs"
 
-const BRANCHES = [
-  { value: "LENINA_5A", label: "г. Иркутск, ул. Ленина, д. 5А" },
-]
+type ApiError = {
+  response?: { data?: { detail?: string; phone_number?: string } }
+}
 
 export default function ProfilePage() {
+  const queryClient = useQueryClient()
   const { data: profile, isLoading } = useProfile()
   const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfile()
   const { mutate: phoneChange, isPending: isPhoneChanging } = usePhoneChange()
-  const { data: shop, isError: shopError } = useMyShop()
+  const { data: shop } = useMyShop()
   const { data: orders } = useOrders()
+  const { mutate: cancelOrder, isPending: isCanceling } = useCancelOrder()
   const { data: hasAdminAccess } = useCheckAdminAccess()
   const { mutate: redirectToAdmin, isPending: isRedirecting } =
     useRedirectToAdmin()
@@ -55,7 +58,7 @@ export default function ProfilePage() {
 
   if (isLoading) {
     return (
-      <div className="max-w-5xl mx-auto p-12 text-center animate-pulse">
+      <div className="mx-auto max-w-5xl px-4 py-12 text-center animate-pulse sm:p-12">
         Загрузка профиля...
       </div>
     )
@@ -63,7 +66,7 @@ export default function ProfilePage() {
 
   if (!profile) {
     return (
-      <div className="max-w-5xl mx-auto p-12 text-center">
+      <div className="mx-auto max-w-5xl px-4 py-12 text-center sm:p-12">
         <p className="text-slate-500">Войдите, чтобы просмотреть профиль</p>
       </div>
     )
@@ -104,8 +107,10 @@ export default function ProfilePage() {
       { action: "send_new", new_phone: newPhone },
       {
         onSuccess: () => setPhoneStep("verify_new"),
-        onError: (err: any) =>
-          setPhoneError(err.response?.data?.phone_number || "Ошибка"),
+        onError: (err: unknown) =>
+          setPhoneError(
+            (err as ApiError).response?.data?.phone_number || "Ошибка",
+          ),
       },
     )
   }
@@ -127,13 +132,43 @@ export default function ProfilePage() {
     )
   }
 
+  const handleCancelOrder = (orderId: number) => {
+    if (!window.confirm("Вы уверены, что хотите отменить заказ?")) {
+      return
+    }
+
+    cancelOrder(orderId, {
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["orders"] })
+        alert("Заказ успешно отменен")
+      },
+      onError: (error: unknown) => {
+        const message =
+          (error as ApiError).response?.data?.detail ||
+          "Ошибка при отмене заказа"
+        alert(message)
+      },
+    })
+  }
+
   return (
-    <main className="max-w-5xl mx-auto p-4 sm:p-6 space-y-8">
+    <main className="mx-auto max-w-5xl space-y-8 p-3 sm:p-6">
       <Breadcrumbs crumbs={[{ label: "Личный кабинет" }]} />
-      <h1 className="text-2xl font-bold">Личный кабинет</h1>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <h1 className="text-2xl font-bold">Личный кабинет</h1>
+        {hasAdminAccess && (
+          <button
+            onClick={() => redirectToAdmin()}
+            disabled={isRedirecting}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-110 disabled:opacity-50 sm:w-auto"
+          >
+            {isRedirecting ? "Переход..." : "Панель администратора"}
+          </button>
+        )}
+      </div>
 
       {/* Основная информация */}
-      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold mb-4">👤 Личные данные</h2>
 
         <form
@@ -209,7 +244,7 @@ export default function ProfilePage() {
             <button
               type="submit"
               disabled={isUpdating}
-              className="px-6 py-2 bg-brand-main text-white rounded-xl font-medium hover:brightness-110 transition-all disabled:opacity-50"
+              className="w-full rounded-xl bg-brand-main px-6 py-2 font-medium text-white transition-all hover:brightness-110 disabled:opacity-50 sm:w-auto"
             >
               {isUpdating ? "Сохранение..." : "Сохранить изменения"}
             </button>
@@ -224,9 +259,9 @@ export default function ProfilePage() {
       </section>
 
       {/* Телефон */}
-      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold mb-4">📞 Номер телефона</h2>
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col items-start gap-2 min-[520px]:flex-row min-[520px]:items-center min-[520px]:gap-4">
           <span className="text-lg font-medium">{profile.phone_number}</span>
           {phoneStep === "idle" && (
             <button
@@ -246,19 +281,19 @@ export default function ProfilePage() {
                 <p className="text-sm text-slate-500">
                   Введите код, отправленный на текущий номер
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 min-[520px]:flex-row">
                   <input
                     type="text"
                     value={oldCode}
                     onChange={(e) => setOldCode(e.target.value)}
                     placeholder="Код из SMS"
                     maxLength={6}
-                    className="px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main outline-none w-40"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-brand-main min-[520px]:w-40"
                   />
                   <button
                     onClick={handleVerifyOldCode}
                     disabled={isPhoneChanging}
-                    className="px-4 py-2 bg-brand-main text-white rounded-xl text-sm font-medium hover:brightness-110 disabled:opacity-50"
+                    className="w-full rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50 min-[520px]:w-auto"
                   >
                     Подтвердить
                   </button>
@@ -270,7 +305,7 @@ export default function ProfilePage() {
                 <p className="text-sm text-slate-500">
                   Введите новый номер телефона
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 min-[520px]:flex-row">
                   <input
                     type="tel"
                     value={newPhone}
@@ -282,12 +317,12 @@ export default function ProfilePage() {
                       setNewPhone(val)
                     }}
                     placeholder="+7..."
-                    className="px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main outline-none w-48"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-brand-main min-[520px]:w-48"
                   />
                   <button
                     onClick={handleSendNewCode}
                     disabled={isPhoneChanging}
-                    className="px-4 py-2 bg-brand-main text-white rounded-xl text-sm font-medium hover:brightness-110 disabled:opacity-50"
+                    className="w-full rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50 min-[520px]:w-auto"
                   >
                     Отправить код
                   </button>
@@ -299,19 +334,19 @@ export default function ProfilePage() {
                 <p className="text-sm text-slate-500">
                   Введите код, отправленный на новый номер
                 </p>
-                <div className="flex gap-2">
+                <div className="flex flex-col gap-2 min-[520px]:flex-row">
                   <input
                     type="text"
                     value={newCode}
                     onChange={(e) => setNewCode(e.target.value)}
                     placeholder="Код из SMS"
                     maxLength={6}
-                    className="px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main outline-none w-40"
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-brand-main min-[520px]:w-40"
                   />
                   <button
                     onClick={handleVerifyNewCode}
                     disabled={isPhoneChanging}
-                    className="px-4 py-2 bg-brand-main text-white rounded-xl text-sm font-medium hover:brightness-110 disabled:opacity-50"
+                    className="w-full rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50 min-[520px]:w-auto"
                   >
                     Подтвердить
                   </button>
@@ -324,20 +359,28 @@ export default function ProfilePage() {
       </section>
 
       {/* Магазин */}
-      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold mb-4">🏪 Магазин</h2>
         {shop ? (
           <div className="space-y-3">
             <p className="font-medium">{shop.name}</p>
             <p className="text-sm text-slate-500">{shop.description}</p>
             {hasAdminAccess && (
-              <button
-                onClick={() => redirectToAdmin()}
-                disabled={isRedirecting}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-brand-main text-white rounded-xl text-sm font-medium hover:brightness-110 transition-all disabled:opacity-50"
-              >
-                ⚙️ {isRedirecting ? "Переход..." : "Панель администратора"}
-              </button>
+              <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                <Link
+                  href="/reports/shop"
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-brand-main px-4 py-2 text-sm font-medium text-brand-main transition-all hover:bg-brand-main hover:text-white sm:w-auto"
+                >
+                  Отчет магазина
+                </Link>
+                <button
+                  onClick={() => redirectToAdmin()}
+                  disabled={isRedirecting}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-110 disabled:opacity-50 sm:w-auto"
+                >
+                  {isRedirecting ? "Переход..." : "Панель администратора"}
+                </button>
+              </div>
             )}
           </div>
         ) : (
@@ -345,7 +388,7 @@ export default function ProfilePage() {
             <p className="text-slate-500">У вас пока нет магазина</p>
             <Link
               href="/shop/create"
-              className="inline-flex items-center gap-2 px-4 py-2 bg-brand-main text-white rounded-xl text-sm font-medium hover:brightness-110 transition-all"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white transition-all hover:brightness-110 sm:w-auto"
             >
               ➕ Стать продавцом
             </Link>
@@ -354,7 +397,7 @@ export default function ProfilePage() {
       </section>
 
       {/* Заказы */}
-      <section className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+      <section className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm sm:p-6">
         <h2 className="text-lg font-bold mb-4">📦 История заказов</h2>
         {orders && orders.length > 0 ? (
           <div className="space-y-6">
@@ -381,7 +424,7 @@ export default function ProfilePage() {
                         "Адрес не указан"}
                     </p>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                     <p className="text-sm text-slate-500">Итого</p>
                     <p className="font-bold text-brand-main text-lg">
                       {Number(order.total_cost).toLocaleString("ru-RU")} ₽
@@ -393,12 +436,12 @@ export default function ProfilePage() {
                   {order.order_items.map((item) => (
                     <div
                       key={item.id}
-                      className="grid grid-cols-[72px_1fr] gap-3 rounded-2xl bg-white p-3 shadow-sm"
+                      className="grid grid-cols-1 gap-3 rounded-2xl bg-white p-3 shadow-sm min-[420px]:grid-cols-[72px_1fr]"
                     >
                       <img
                         src={item.product_variant_image || "/placeholder.png"}
                         alt={item.product_variant_name}
-                        className="h-18 w-18 rounded-2xl object-cover"
+                        className="h-40 w-full rounded-2xl object-cover min-[420px]:h-18 min-[420px]:w-18"
                       />
                       <div className="space-y-1 text-sm">
                         <p className="font-medium text-slate-900">
@@ -425,6 +468,18 @@ export default function ProfilePage() {
                     </div>
                   ))}
                 </div>
+
+                {order.status === "CREATED" && (
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      onClick={() => handleCancelOrder(order.id)}
+                      disabled={isCanceling}
+                      className="w-full rounded-lg border border-red-200 px-4 py-2 text-red-600 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 sm:w-auto"
+                    >
+                      {isCanceling ? "Отмена..." : "Отменить заказ"}
+                    </button>
+                  </div>
+                )}
               </div>
             ))}
           </div>

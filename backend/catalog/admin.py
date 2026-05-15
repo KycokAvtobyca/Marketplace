@@ -182,6 +182,7 @@ class ProductVariantInline(admin.TabularInline):
     extra = 1
     fields = ("sku", "price", "stock", "is_active", "is_main")
     readonly_fields = ("sku",)
+    autocomplete_fields = ("attribute_values",)
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -203,6 +204,14 @@ class ProductAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
     inlines = [ProductVariantInline]
     list_per_page = 20
     date_hierarchy = "date_time_create"
+    autocomplete_fields = (
+        "category",
+        "brand",
+        "product_type",
+        "shop",
+        "tags",
+        "attributes",
+    )
 
     def get_list_filter(self, request):
         if request.user.is_superuser:
@@ -229,6 +238,7 @@ class ProductVariantAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
     list_filter = ("is_active", "is_main")
     readonly_fields = ("sku",)
     list_per_page = 30
+    autocomplete_fields = ("product", "attribute_values")
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)

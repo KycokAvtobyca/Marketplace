@@ -2,7 +2,20 @@
 
 /* Твои глобальные стили теперь можно писать на чистом CSS */
 @layer base {
+  html {
+    overflow-x: hidden;
+  }
+
   body {
     @apply bg-slate-50 text-slate-900;
+    min-width: 320px;
+    overflow-x: hidden;
+  }
+
+  img,
+  video,
+  canvas,
+  svg {
+    max-width: 100%;
   }
 }

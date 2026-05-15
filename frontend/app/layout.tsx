@@ -13,11 +13,11 @@ import { CompactHeader } from "@/widgets/CompactHeader"
 import { Header } from "@/widgets/Header"
 import { AuthWindow } from "@/widgets/AuthWindow/ui/AuthWindow"
 
-export const revalidate = parseInt(String(process.env.NEXT_REVALIDATE)) || 7200
+export const revalidate = 7200
 
 export const metadata: Metadata = {
   title: "Маркетплейс Флоппи",
-  description: "Курсовая работа Лыскова Ивана: Маркетплейс на Next.js + Django",
+  description: "Маркетплейс на Next.js + Django",
 }
 
 export default async function RootLayout({
@@ -45,15 +45,17 @@ export default async function RootLayout({
   return (
     <QueryProvider>
       <html lang="ru">
-        <body className="items-center min-h-screen flex flex-col bg-default text-brand-main">
+        <body className="flex min-h-screen flex-col items-center overflow-x-hidden bg-default text-brand-main">
           <HydrationBoundary state={dehydrate(queryClient)}>
-            <div className="max-w-5xl p-3 w-full relative flex flex-col min-h-screen">
-              <Header />
+            <div className="relative flex min-h-screen w-full max-w-5xl flex-col px-2 py-3 sm:px-3">
+              <div className="sticky top-0 z-[35] hidden sm:block">
+                <Header />
+              </div>
+              <div className="sticky top-0 z-[35] block sm:hidden">
+                <CompactHeader />
+              </div>
               <div className="h-4 sm:h-6" />
               <main className="grow space-y-5 pb-10">
-                <div className="flex min-[450px]:hidden">
-                  <CompactHeader />
-                </div>
                 {children}
               </main>
               <AuthWindow />

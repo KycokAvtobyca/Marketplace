@@ -1,19 +1,23 @@
 import { FieldValues, Path, UseFormSetError } from "react-hook-form"
 
 export interface BaseErrorResponse {
-  detail?: {
-    message?: string
-    seconds_left?: string
-  }
-  [key: string]: any
+  detail?:
+    | string
+    | {
+        message?: string
+        seconds_left?: string
+      }
 }
 
 const NON_FIELD_KEYS = ["detail", "non_field_errors"]
 
-export const errorHandler = <
-  T extends FieldValues,
-  K extends BaseErrorResponse,
->(
+const isDetailObject = (
+  value: unknown,
+): value is { message?: string; seconds_left?: string } => {
+  return !!value && typeof value === "object"
+}
+
+export const errorHandler = <T extends FieldValues, K extends object>(
   e: { data: K } | undefined,
   setError: UseFormSetError<T>,
   formValues?: T,
@@ -25,33 +29,49 @@ export const errorHandler = <
     if (!e) throw new Error("Не передана ошибка из стора.")
 
     const data = e?.data
-    const seconds_left = e?.data?.detail?.seconds_left
 
     if (!data || typeof data !== "object") {
       throw new Error("Данные ошибки не переданы или не являются объектом.")
     }
 
     const keys = Object.keys(data) as (keyof K)[]
+    const detail = "detail" in data ? data.detail : undefined
+    const seconds_left = isDetailObject(detail) ? detail.seconds_left : undefined
 
     let isErrorSet = false
 
     keys.forEach((key) => {
-      const backendMessage: string | undefined = Array.isArray(data[key])
-        ? data[key][0]
-        : key === "detail"
-          ? data[key]?.message
-          : data[key]
+      const value = data[key]
+      const fieldName = String(key)
+      let backendMessage: string | undefined
+
+      if (Array.isArray(value)) {
+        const first = value[0]
+        backendMessage = typeof first === "string" ? first : undefined
+      } else if (key === "detail") {
+        backendMessage =
+          typeof value === "string"
+            ? value
+            : isDetailObject(value)
+              ? value.message
+              : undefined
+      } else if (typeof value === "string") {
+        backendMessage = value
+      }
 
       if (backendMessage) {
         isErrorSet = true
 
         if (
-          NON_FIELD_KEYS.includes(String(key)) ||
-          (formValues && !(key in formValues))
+          NON_FIELD_KEYS.includes(fieldName) ||
+          (formValues && !(fieldName in formValues))
         ) {
           setError("root", { type: "manual", message: backendMessage })
         } else {
-          setError(key as Path<T>, { type: "manual", message: backendMessage })
+          setError(fieldName as Path<T>, {
+            type: "manual",
+            message: backendMessage,
+          })
         }
       }
     })

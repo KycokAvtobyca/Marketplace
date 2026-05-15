@@ -18,9 +18,6 @@ export const AuthWindow = () => {
     })),
   )
 
-  // Добавляем стейт, чтобы знать, что мы в браузере
-  const [mounted, setMounted] = useState(false)
-
   const isAuth = useAuthStore((state) => state.isAuth)
 
   const [isCodeStep, setIsCodeStep] = useState(false)
@@ -29,8 +26,6 @@ export const AuthWindow = () => {
   // useEffect срабатывает только на клиенте после первого рендера
   useEffect(() => {
     if (!isOpen) return
-
-    setMounted(true)
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") toggle()
@@ -41,12 +36,13 @@ export const AuthWindow = () => {
     return () => {
       window.removeEventListener("keydown", handleKeyDown)
     }
-  })
+  }, [isOpen, toggle])
 
   // Если мы еще не на клиенте или пользователь авторизован - ничего не рендерим
-  if (!mounted || isAuth) return null
+  if (isAuth) return null
 
-  const portalRoot = document.getElementById("modals")
+  const portalRoot =
+    typeof document === "undefined" ? null : document.getElementById("modals")
   if (!portalRoot) return null
 
   return createPortal(

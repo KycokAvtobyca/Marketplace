@@ -270,6 +270,81 @@ class MarketingBase(DateTimeCreateMixin, DateTimeUpdateMixin):
         super().save(*args, **kwargs)
 
 
+    def _target_matches_variant(self, variant, user=None):
+        product = variant.product
+
+        if self.is_global:
+            return True
+
+        if self.product_variant_id:
+            return self.product_variant_id == variant.pk
+
+        if self.product_id:
+            return self.product_id == product.pk
+
+        if self.tag_id:
+            return product.tags.filter(pk=self.tag_id).exists()
+
+        if self.brand_id:
+            return self.brand_id == product.brand_id
+
+        if self.category_id:
+            return self.category_id == product.category_id
+
+        if self.user_id:
+            return bool(user and user.is_authenticated and self.user_id == user.id)
+
+        if self.segment_id:
+            return bool(
+                user
+                and user.is_authenticated
+                and user.segments.filter(pk=self.segment_id).exists()
+            )
+
+        return False
+
+    def _is_variant_excluded(self, variant, user=None):
+        product = variant.product
+
+        if self.excluded_variants.filter(pk=variant.pk).exists():
+            return True
+
+        if self.excluded_products.filter(pk=product.pk).exists():
+            return True
+
+        if product.brand_id and self.excluded_brands.filter(pk=product.brand_id).exists():
+            return True
+
+        if product.category_id and self.excluded_categories.filter(pk=product.category_id).exists():
+            return True
+
+        if self.excluded_tags.filter(pk__in=product.tags.values("pk")).exists():
+            return True
+
+        if user and user.is_authenticated:
+            if self.excluded_users.filter(pk=user.pk).exists():
+                return True
+
+            if self.excluded_segments.filter(pk__in=user.segments.values("pk")).exists():
+                return True
+
+        return False
+
+    def is_applicable_to_variant(self, variant, user=None):
+        return self._target_matches_variant(
+            variant, user=user
+        ) and not self._is_variant_excluded(variant, user=user)
+
+    def get_eligible_total(self, cart_items, user=None):
+        total = 0
+
+        for item in cart_items:
+            if self.is_applicable_to_variant(item.product_variant, user=user):
+                total += item.total_price
+
+        return total
+
+
 class Discount(MarketingBase):
     name = models.CharField("Название акции", blank=True, max_length=99)
     description = models.TextField(
@@ -366,6 +441,16 @@ class PromoCode(MarketingBase):
                 "Количество использований промокода достигло максимума.",
             )
 
+        if user and user.is_authenticated:
+            if self.excluded_users.filter(pk=user.pk).exists():
+                return False, doesnt_have
+
+            if self.excluded_segments.filter(pk__in=user.segments.values("pk")).exists():
+                return False, doesnt_have
+
+        if order_total is not None and order_total <= 0:
+            return False, "Промокод не применим к товарам в корзине."
+
         # Проверка суммы корзины/заказа (Инкапсуляция логики)
         if (
             order_total is not None
@@ -443,9 +528,6 @@ class PromoCode(MarketingBase):
     def clean(self):
         super().clean()
 
-        if not self.user_id:
-            raise ValidationError({"user": "Пользователен должен быть указан."})
-
         # Гарантируем, что заполнено только что-то одно
         has_percentage = self.discount_percentage > 0
         has_amount = self.amount is not None and self.amount > 0
@@ -457,3 +539,7 @@ class PromoCode(MarketingBase):
 
         if not has_percentage and not has_amount:
             raise ValidationError("Укажите размер скидки (процент или сумму).")
+
+    def save(self, *args, **kwargs):
+        self.code = (self.code or "").strip().upper()
+        super().save(*args, **kwargs)

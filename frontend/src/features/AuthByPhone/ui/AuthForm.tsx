@@ -4,6 +4,7 @@ import {
   useForm,
   Controller,
   FormProvider,
+  useWatch,
   UseFormSetError,
   FieldValues,
 } from "react-hook-form"
@@ -20,7 +21,7 @@ import { errorHandler } from "@/shared/lib/error-handler"
 import { JSX, useEffect, useRef, useState } from "react"
 import clsx from "clsx"
 import styles from "./AuthForm.module.scss"
-import { AuthApiAction, useAuthStore } from "@/entities/auth"
+import { AuthApiAction } from "@/entities/auth"
 import { useAuth, useSendSms } from "@/entities/auth"
 import { THROTTLES } from "@/shared/config/throttles"
 import { OtpInput } from "@/shared/ui/OtpInput"
@@ -38,8 +39,10 @@ export const AuthForm: React.FC<Props> = ({
 }) => {
   // 1. Состояния UI и React Query
   const [isTyping, setIsTyping] = useState(false)
-  const { mutateAsync: mutateAsyncSms, isPending: isPendingSms } = useSendSms()
-  const { mutateAsync: mutateAsyncPhone, isPending: isPendingAuth } = useAuth()
+  const [isPasswordRequired, setIsPasswordRequired] = useState(false)
+  const [adminPassword, setAdminPassword] = useState("")
+  const { mutateAsync: mutateAsyncSms } = useSendSms()
+  const { mutateAsync: mutateAsyncPhone } = useAuth()
 
   // const { isAuth, isCodeSent, isLoading } = useAuthStore(
   //   useShallow((state) => ({
@@ -92,6 +95,11 @@ export const AuthForm: React.FC<Props> = ({
       isValid: isCodeValid,
     },
   } = codeForm
+
+  const smsCodeValue = useWatch({
+    control: codeForm.control,
+    name: "sms_code",
+  }) || ""
 
   // 4. Таймеры
   const {
@@ -166,6 +174,8 @@ export const AuthForm: React.FC<Props> = ({
     // Если все успешно, то переходим на смс-код
     // useAuthWindowStore.getState().setIsPhonePage(false)
     setIsCodeStep(true)
+    setIsPasswordRequired(false)
+    setAdminPassword("")
 
     // Ресетим все
     phoneForm.reset(undefined, {
@@ -195,13 +205,41 @@ export const AuthForm: React.FC<Props> = ({
     const result = await mutateAsyncPhone({
       phone_number: phone,
       sms_code: data.sms_code,
+      password: adminPassword,
     })
+
+    if (result.requiresPassword) {
+      setIsPasswordRequired(true)
+      setCodeError("root", {
+        type: "manual",
+        message: "Введите пароль администратора.",
+      })
+      return
+    }
 
     // При ошибке вызываем обработчик и выходим
     if (!result.success) {
       console.log("Проверка ошибки sms", result.error)
 
       const codeFormValues = codeForm.getValues()
+
+      if (isPasswordRequired) {
+        const detail = result.error?.data?.detail
+        setCodeError("root", {
+          type: "manual",
+          message:
+            detail?.message ||
+            result.error?.data?.non_field_errors?.[0] ||
+            "Неверный пароль администратора",
+        })
+        codeForm.reset(codeFormValues, {
+          keepErrors: true,
+          keepIsSubmitted: false,
+          keepTouched: false,
+          keepValues: true,
+        })
+        return
+      }
 
       errorFromAPISet(
         result,
@@ -232,6 +270,8 @@ export const AuthForm: React.FC<Props> = ({
   // onClick для кнопки повторного смс
   const onClickRepeatSMS = async () => {
     const phone = phoneForm.getValues("phone_number")
+    setIsPasswordRequired(false)
+    setAdminPassword("")
     const result = await mutateAsyncSms(phone)
 
     if (!result.success) {
@@ -261,7 +301,7 @@ export const AuthForm: React.FC<Props> = ({
   const renderPhoneStep = (): JSX.Element => (
     <form
       onSubmit={handlePhoneSubmit(onSubmitPhoneNumber)}
-      className="flex flex-col items-end"
+      className="flex w-full flex-col items-stretch"
     >
       {phoneErrors.root && (
         <div className="text-red-500 text-sm mb-6 text-center">
@@ -301,7 +341,7 @@ export const AuthForm: React.FC<Props> = ({
       <button
         type="submit"
         disabled={isPhoneBtnDisabled}
-        className={clsx("whitespace-nowrap pt-2 transition-all", {
+        className={clsx("pt-2 text-left transition-all sm:text-right", {
           "text-gray-400 cursor-not-allowed": isPhoneBtnDisabled,
           "cursor-pointer hover:opacity-80": !isPhoneBtnDisabled,
         })}
@@ -318,10 +358,10 @@ export const AuthForm: React.FC<Props> = ({
   // Рендер этапа 2: Ввод смс-кода
   const renderCodeStep = (): JSX.Element => (
     <FormProvider {...codeForm}>
-      <div className="flex flex-col items-center animate-in fade-in duration-500">
+      <div className="flex w-full flex-col items-center animate-in fade-in duration-500">
         <form
           onSubmit={handleCodeSubmit(onSubmitCode)}
-          className="flex flex-col items-center space-y-4"
+          className="flex w-full flex-col items-center space-y-4"
         >
           {phoneErrors.root && (
             <div className="text-red-500 text-sm mb-6 text-center">
@@ -362,12 +402,26 @@ export const AuthForm: React.FC<Props> = ({
             </p>
           )}
 
+          {isPasswordRequired && (
+            <input
+              type="password"
+              value={adminPassword}
+              onChange={(e) => {
+                setAdminPassword(e.target.value)
+                clearCodeErrors("root")
+              }}
+              placeholder="Пароль администратора"
+              autoComplete="current-password"
+              className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main focus:ring-1 focus:ring-brand-main outline-none"
+            />
+          )}
+
           <button
             type="submit"
             disabled={
               isActiveCode ||
-              !codeForm.formState.isDirty ||
-              (codeForm.watch("sms_code") || "").length !== 6
+              smsCodeValue.length !== 6 ||
+              (isPasswordRequired && !adminPassword)
             }
             className={styles.buttonAuth}
           >

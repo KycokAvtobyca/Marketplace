@@ -27,7 +27,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
     setPriceMax("")
     setAppliedQueryString("")
 
-    const preservedSearch = searchParams.get("search")?.trim()
+    const preservedSearch = searchParams?.get("search")?.trim()
     const params = new URLSearchParams()
     if (preservedSearch) params.set("search", preservedSearch)
 
@@ -43,7 +43,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
     const params = getApiParams(selectedFilters)
     const searchParamsForUrl = new URLSearchParams()
 
-    const preservedSearch = searchParams.get("search")?.trim()
+    const preservedSearch = searchParams?.get("search")?.trim()
     if (preservedSearch) {
       searchParamsForUrl.set("search", preservedSearch)
     }
@@ -74,7 +74,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
   return (
     <aside
       className={clsx(
-        "self-start flex flex-col w-64 shrink-0 hidden min-[800px]:flex",
+        "sticky top-20 hidden max-h-[calc(100vh-6rem)] w-60 shrink-0 flex-col self-start overflow-hidden min-[800px]:flex xl:w-64",
         "bg-white border border-slate-100 rounded-2xl p-4 shadow-sm",
         className,
       )}
@@ -97,7 +97,7 @@ export const FilterSidebar: React.FC<FilterSidebarProps> = ({ className }) => {
         </button>
       </div>
 
-      <div className="pr-1 min-w-0">
+      <div className="min-w-0 overflow-y-auto pr-1">
         {/* Удаляем лишние gap, чтобы аккордеоны стояли плотно */}
         <div className="flex flex-col">
           <PriceRangeFilter

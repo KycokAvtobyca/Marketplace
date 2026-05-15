@@ -3,7 +3,7 @@ import { useRef, useState } from "react"
 import styles from "./OtpInput.module.scss"
 
 export const OtpInput = () => {
-  const { setValue, clearErrors, watch } = useFormContext()
+  const { setValue, watch } = useFormContext()
   const [wasFilled, setWasFilled] = useState(false)
 
   // const value = watch("sms_code") || ""
@@ -15,7 +15,6 @@ export const OtpInput = () => {
 
     const arr = value.split("")
     while (arr.length < 6) arr.push("")
-    console.log(arr)
 
     arr[index] = char
 
@@ -65,7 +64,7 @@ export const OtpInput = () => {
   }
 
   return (
-    <div className="flex gap-2 space-x-4">
+    <div className="flex w-full justify-between gap-1.5">
       {[...Array(6)].map((_, i) => (
         <input
           name="code"

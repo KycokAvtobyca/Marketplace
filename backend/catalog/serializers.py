@@ -58,9 +58,18 @@ class CategorySerializer(serializers.ModelSerializer):
             # Фолбэк (на случай, если сериализатор вызван без миксина). N+1
             children = obj.get_children()
 
-        return CategorySerializer(
-            children, many=True, context=self.context
-        ).data
+        if all_nodes is not None:
+            parent_ids = {node.parent_id for node in all_nodes if node.parent_id}
+            has_child = lambda node: node.id in parent_ids
+        else:
+            has_child = lambda node: node.get_children().exists()
+
+        children = sorted(
+            children,
+            key=lambda node: (0 if has_child(node) else 1, node.name.lower(), node.pk),
+        )
+
+        return CategorySerializer(children, many=True, context=self.context).data
 
 
 class BrandSerializer(serializers.ModelSerializer):
@@ -173,17 +182,11 @@ class ProductCatalogSerializer(serializers.ModelSerializer):
         return None
 
     def get_sku(self, obj):
-        variant = (
-            obj.variants.filter(is_active=True)
-            .order_by("-is_main", "pk")
-            .first()
-        )
-        return variant.sku if variant else None
+        return obj.api_sku
 
     def get_variant_id(self, obj):
-        # Получаем первый активный вариант товара
-        variant = obj.variants.filter(is_active=True).first()
-        return variant.id if variant else None
+        # Получаем главный активный вариант товара
+        return obj.api_variant_id
 
     class Meta:
         model = Product

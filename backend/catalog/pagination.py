@@ -35,6 +35,21 @@ class DefaultCursorPagination(CursorPagination):
     template = None
 
 
+class ProductCatalogPagination(DefaultCursorPagination):
+    sort_ordering = {
+        "price_asc": ("-has_stock", "api_price", "id"),
+        "price_desc": ("-has_stock", "-api_price", "-id"),
+        "new": ("-has_stock", "-date_time_create", "-id"),
+        "popular": ("-has_stock", "-api_rating", "-views", "-id"),
+        "views_desc": ("-has_stock", "-views", "-id"),
+        "rating_desc": ("-has_stock", "-api_rating", "-id"),
+    }
+
+    def get_ordering(self, request, queryset, view):
+        sort = request.query_params.get("sort", "new")
+        return self.sort_ordering.get(sort, self.sort_ordering["new"])
+
+
 class DefaultOrderPagination(CursorPagination):
     """Pagination класс для заказов."""
     page_size = api_settings.PAGE_SIZE

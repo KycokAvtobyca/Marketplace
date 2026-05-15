@@ -6,7 +6,6 @@ import { Icon } from "@/shared/ui/Icons/Icon"
 import { useRef, useState } from "react"
 import Link from "next/link"
 import dynamic from "next/dynamic"
-import { ROUTES } from "@/shared/config/routes"
 import styles from "./UserButton.module.scss"
 import { useProfile } from "@/entities/user/api/useProfile"
 import { useLogout } from "@/entities/auth/api/useLogout"
@@ -17,7 +16,7 @@ export const UserButtonBase = () => {
   const toggleAuthWindow = useAuthWindowStore((s) => s.toggle)
   const buttonRef = useRef<HTMLButtonElement>(null)
 
-  const { data: profile, isError, isLoading } = useProfile()
+  const { data: profile, isError } = useProfile()
   const { mutate: logout, isPending: isLoggingOut } = useLogout()
   const authStoreIsAuth = useAuthStore((s) => s.isAuth)
 

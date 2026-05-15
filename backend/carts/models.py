@@ -3,6 +3,7 @@ from common.mixins import (
     DateTimeUpdateMixin,
 )
 from common.models import SiteConfiguration
+from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import (
@@ -43,41 +44,56 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
         return f"Корзина {self.user.phone_number} (ID: {self.pk})"
 
     # Считает также с точечной скидкой
+    def get_total_items_price(self, cart_items=None):
+        items = cart_items if cart_items is not None else self.cart_items.all()
+        return sum(item.total_price for item in items)
+
+    def get_promocode_eligible_total(self, cart_items=None):
+        if not self.promocode:
+            return Decimal("0.00")
+
+        items = cart_items if cart_items is not None else self.cart_items.all()
+        return self.promocode.get_eligible_total(items, user=self.user)
+
+    def calculate_total_cost(self, cart_items=None):
+        base_price = self.get_total_items_price(cart_items)
+        if base_price <= 0:
+            return Decimal("0.00")
+
+        eligible_price = self.get_promocode_eligible_total(cart_items)
+        if (
+            not self.promocode
+            or eligible_price <= 0
+            or eligible_price < self.promocode.min_amount
+        ):
+            return base_price
+
+        config = SiteConfiguration.load()
+        max_discount_limit = eligible_price * Decimal(
+            str(config.max_discount_percentage)
+        )
+
+        if self.promocode.amount:
+            proposed_discount = self.promocode.amount
+        elif self.promocode.discount_percentage:
+            proposed_discount = eligible_price * Decimal(
+                str(self.promocode.discount_percentage)
+            )
+        else:
+            proposed_discount = Decimal("0.00")
+
+        actual_discount = min(proposed_discount, max_discount_limit, eligible_price)
+        return max(Decimal("1.00"), base_price - actual_discount)
+
     @cached_property
     def total_items_price(self):
         """Считает стоимость всех товаров без учета промокода, но с учетом всех скидок."""
         # Используем генератор, чтобы избежать лишних N+1 запросов,
-        return sum(item.total_price for item in self.cart_items.all())
+        return self.get_total_items_price()
 
     @cached_property
     def total_cost(self):
-        """Считает финальную стоимость с учетом примененного промокода."""
-        base_price = self.total_items_price
-        if base_price <= 0:
-            return 0
-
-        # Если промокод есть и он валиден по сумме
-        if self.promocode and base_price >= self.promocode.min_amount:
-            # Получаем глобальный лимит
-            config = SiteConfiguration.load()
-            max_discount_limit = base_price * config.max_discount_percentage
-
-            if self.promocode.amount:
-                proposed_discount = self.promocode.amount
-            elif self.promocode.discount_percentage:
-                proposed_discount = (
-                    base_price * self.promocode.discount_percentage
-                )
-            else:
-                proposed_discount = 0
-
-            # Мы не можем дать скидку больше, чем разрешено конфигом
-            actual_discount = min(proposed_discount, max_discount_limit)
-
-            # Гарантируем, что цена заказа не упадет ниже 1 рубля
-            return max(1, base_price - actual_discount)
-
-        return base_price
+        return self.calculate_total_cost()
 
     def clear_cache(self):
         """Принудительный сброс закэшированных расчетов."""
@@ -92,13 +108,15 @@ class Cart(DateTimeCreateMixin, DateTimeUpdateMixin):
 
         if self.promocode:
             self.promocode.can_use(
-                user=self.user, order_total=self.total_items_price
+                user=self.user,
+                order_total=self.get_promocode_eligible_total(),
             )
 
     def save(self, *args, **kwargs):
         if self.promocode:
             self.promocode.can_use(
-                user=self.user, order_total=self.total_items_price
+                user=self.user,
+                order_total=self.get_promocode_eligible_total(),
             )
 
         super().save(*args, **kwargs)

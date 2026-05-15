@@ -4,7 +4,6 @@ import Link from "next/link"
 import { useGetCart } from "@/entities/cart/api/useCart"
 import { useAuthWindowStore } from "@/entities/authWindow"
 import { Icon } from "@/shared/ui/Icons/Icon"
-import { ROUTES } from "@/shared/config/routes"
 import { useProfile } from "@/entities/user/api/useProfile"
 
 // Импортируем интерфейс, если он лежит в другом файле

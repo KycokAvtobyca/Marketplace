@@ -21,6 +21,26 @@ export interface ProductVariant {
   images: ProductImage[]
 }
 
+interface ProductTreeNode {
+  name: string
+  slug: string
+  children: ProductTreeNode[]
+}
+
+interface ProductAttributeValue {
+  id: number
+  name: string
+  slug?: string
+}
+
+interface ProductAttribute {
+  id: number
+  name: string
+  slug?: string
+  values?: ProductAttributeValue[]
+  attribute_values?: ProductAttributeValue[]
+}
+
 export interface ProductDetail {
   id: number
   name: string
@@ -30,13 +50,13 @@ export interface ProductDetail {
   category: {
     name: string
     slug: string
-    children: any[]
+    children: ProductTreeNode[]
   } | null
   brand: { name: string; slug: string } | null
   shop: { name: string; slug: string; owner: number } | null
   product_type: { name: string; slug: string } | null
   tags: Array<{ name: string; slug: string }>
-  attributes: Array<any>
+  attributes: ProductAttribute[]
   variants: ProductVariant[]
 }
 

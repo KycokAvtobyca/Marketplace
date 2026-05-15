@@ -1,5 +1,5 @@
 export const getApiParams = (selectedFilters: (string | number)[]) => {
-  const params: Record<string, any> = {}
+  const params: Record<string, string[]> = {}
 
   selectedFilters.forEach((item) => {
     // Разбиваем строку 'category__obuv' на ['category', 'obuv']

@@ -2,7 +2,6 @@ import { ReactNode } from "react"
 import { useMountTransition } from "@/shared/lib/hooks"
 import clsx from "clsx"
 import { createPortal } from "react-dom"
-import { useEffect, useState } from "react"
 import { Icon } from "@/shared/ui/Icons"
 
 interface ModalMenuProps {
@@ -25,20 +24,9 @@ export const ModalMenu: React.FC<ModalMenuProps> = ({
     transitionDuration,
   })
 
-  // Состояние для проверки, находимся ли мы на клиенте
-  const [mounted, setMounted] = useState(false)
-
-  // useEffect срабатывает только в браузере
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
-  if (!mounted) {
-    return
-  }
-
   // Теперь мы точно в браузере, и document существует
-  const portalRoot = document.getElementById("modals")
+  const portalRoot =
+    typeof document === "undefined" ? null : document.getElementById("modals")
 
   return (
     <>

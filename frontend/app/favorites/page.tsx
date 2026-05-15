@@ -8,15 +8,17 @@ import {
 } from "@/entities/products/ui/ProductCard"
 import { Icon } from "@/shared/ui/Icons/Icon"
 import Link from "next/link"
+import { Breadcrumbs } from "@/widgets/Breadcrumbs"
 
 export const FavoritesPage = () => {
-  const { data, isLoading, isError } = useGetFavorites()
+  const { data, isLoading } = useGetFavorites()
 
   if (isLoading) {
     return (
       <main className="max-w-5xl mx-auto p-4 sm:p-6">
+        <Breadcrumbs crumbs={[{ label: "Избранное" }]} />
         <h1 className="text-2xl font-bold mb-6">Избранное</h1>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2 md:grid-cols-3 lg:grid-cols-4">
           {[...Array(4)].map((_, i) => (
             <ProductCardSkeleton key={i} />
           ))}
@@ -29,7 +31,10 @@ export const FavoritesPage = () => {
 
   if (favoriteItems.length === 0) {
     return (
-      <main className="max-w-5xl mx-auto p-12 text-center flex flex-col items-center gap-4">
+      <main className="mx-auto flex max-w-5xl flex-col items-center gap-4 px-4 py-12 text-center sm:p-12">
+        <div className="w-full text-left">
+          <Breadcrumbs crumbs={[{ label: "Избранное" }]} />
+        </div>
         <div className="p-6 bg-slate-50 rounded-full text-slate-300">
           <Icon.HEARTBRAND className="w-16 h-16" />
         </div>
@@ -50,30 +55,31 @@ export const FavoritesPage = () => {
   }
 
   return (
-    <main className="max-w-5xl mx-auto p-4 sm:p-6 animate-in fade-in duration-500">
-      <div className="flex items-center justify-between mb-8">
+    <main className="mx-auto max-w-5xl p-4 animate-in fade-in duration-500 sm:p-6">
+      <Breadcrumbs crumbs={[{ label: "Избранное" }]} />
+      <div className="mb-8 flex flex-col gap-2 min-[420px]:flex-row min-[420px]:items-center min-[420px]:justify-between">
         <h1 className="text-2xl font-bold text-slate-900">Избранное</h1>
         <span className="text-sm text-slate-500">
           {favoriteItems.length} товаров
         </span>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 sm:gap-6">
+      <div className="grid grid-cols-1 gap-4 min-[380px]:grid-cols-2 sm:gap-6 md:grid-cols-3 lg:grid-cols-4">
         {favoriteItems.map((item) => (
           <ProductCard
             key={item.id}
             // Маппим данные из product_variant в формат, который ждет карточка
             product={
               {
-                id: item.product_variant.id,
+                id: item.product_variant.product_id,
                 name: item.product_variant.product_name,
-                price: item.product_variant.final_price,
-                old_price: item.product_variant.price,
+                price: String(item.product_variant.final_price),
+                old_price: String(item.product_variant.price),
                 image: item.product_variant.image,
                 stock: item.product_variant.stock,
                 rating: 5, // Или другое поле из твоей модели
-                slug: item.product_variant.product_slug,
-              } as any
+                variant_id: item.product_variant.id,
+              }
             }
           />
         ))}

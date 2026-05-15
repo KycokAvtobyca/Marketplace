@@ -14,6 +14,14 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
+    const errorCode = error.response?.data?.detail?.code || error.response?.data?.code
+
+    if (errorCode === "user_blocked") {
+      if (typeof window !== "undefined") {
+        window.location.href = "/blocked"
+      }
+      return Promise.reject(error)
+    }
 
     // Ловим и 401 (Unauthorized) и 403 (Forbidden/CSRF Failed)
     if (

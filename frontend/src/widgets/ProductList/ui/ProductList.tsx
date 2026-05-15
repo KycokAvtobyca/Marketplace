@@ -1,29 +1,51 @@
 "use client"
 
-import { useMemo } from "react"
-import { useSearchParams } from "next/navigation"
+import { useMemo, useRef, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { ProductCard, ProductCardSkeleton } from "@/entities/products"
-import { ProductCatalogResponse } from "@/entities/products/model/types"
 import { useCatalogProducts } from "@/entities/products"
 import { useFilterModalMenuStore } from "@/entities/filters"
+import { Popover } from "@/shared/ui/Popover"
 import clsx from "clsx"
 
+const SORT_OPTIONS = [
+  { value: "new", label: "Сначала новые" },
+  { value: "price_asc", label: "Сначала дешевле" },
+  { value: "price_desc", label: "Сначала дороже" },
+  { value: "popular", label: "Популярные" },
+  { value: "views_desc", label: "По просмотрам" },
+  { value: "rating_desc", label: "По рейтингу" },
+] as const
+
+type SortValue = (typeof SORT_OPTIONS)[number]["value"]
+
+const isSortValue = (value: string | null): value is SortValue =>
+  SORT_OPTIONS.some((option) => option.value === value)
+
 export const ProductList = () => {
-  // Достаем примененную строку фильтров
   const appliedQueryString = useFilterModalMenuStore(
     (s) => s.appliedQueryString,
   )
+  const router = useRouter()
   const searchParams = useSearchParams()
   const search = searchParams?.get("search")?.trim() || ""
-  const urlCategories = searchParams?.getAll("categories") || []
-  const urlCategoryAlias = searchParams?.get("category")?.trim()
-  const categoriesFromUrl = [
-    ...urlCategories.map((value) => value?.trim()).filter(Boolean),
-    ...(urlCategoryAlias ? [urlCategoryAlias] : []),
-  ]
+  const sortFromUrl = searchParams?.get("sort") || null
+  const sort: SortValue = isSortValue(sortFromUrl) ? sortFromUrl : "new"
+  const [isSortOpen, setIsSortOpen] = useState(false)
+  const sortButtonRef = useRef<HTMLButtonElement>(null)
+  const sortLabel =
+    SORT_OPTIONS.find((option) => option.value === sort)?.label ||
+    SORT_OPTIONS[0].label
 
   const queryString = useMemo(() => {
     const params = new URLSearchParams(appliedQueryString)
+    const urlCategories = searchParams?.getAll("categories") || []
+    const urlCategoryAlias = searchParams?.get("category")?.trim()
+    const categoriesFromUrl = [
+      ...urlCategories.map((value) => value?.trim()).filter(Boolean),
+      ...(urlCategoryAlias ? [urlCategoryAlias] : []),
+    ]
+
     if (search) {
       params.set("search", search)
     } else {
@@ -37,50 +59,108 @@ export const ProductList = () => {
       params.delete("categories")
     }
 
+    params.set("sort", sort)
     return params.toString()
-  }, [appliedQueryString, search, categoriesFromUrl])
+  }, [appliedQueryString, search, searchParams, sort])
 
-  // Используем ваш хук.
-  // Как только appliedQueryString или search изменятся, React Query сделает новый запрос.
+  const handleSortChange = (value: SortValue) => {
+    const params = new URLSearchParams(searchParams?.toString())
+    if (value === "new") {
+      params.delete("sort")
+    } else {
+      params.set("sort", value)
+    }
+
+    const nextQuery = params.toString()
+    router.replace(
+      nextQuery
+        ? `${window.location.pathname}?${nextQuery}`
+        : window.location.pathname,
+      { scroll: false },
+    )
+    setIsSortOpen(false)
+  }
+
   const { data, isLoading, isError } = useCatalogProducts(queryString)
 
-  // const { data, isLoading, isError } = useQuery({
-  //   queryKey: ["products"],
-  //   queryFn: async () => {
-  //     const response = await api.get<ProductCatalogResponse>(
-  //       ROUTES.PRODUCTSCATALOG,
-  //     )
-  //     return response.data
-  //   },
-  // })
-
-  // Сетка (Grid) общая для всех состояний, чтобы верстка не "прыгала"
   const gridClassName = clsx(
     "grid",
-    "grid-cols-2", // На маленьких экранах 2 колонки
-    "sm:grid-cols-3", // От 640px - 3 колонки
-    "md:grid-cols-3", // Учитываем сайдбар: на средних экранах лучше оставить 3
-    "lg:grid-cols-4", // На десктопе в контейнере max-w-5xl с сайдбаром 4 колонки - оптимально
+    "grid-cols-1",
+    "min-[380px]:grid-cols-2",
+    "sm:grid-cols-3",
+    "lg:grid-cols-4",
     "gap-3 sm:gap-4 md:gap-5",
   )
 
-  // 1. Состояние загрузки (показываем 6 скелетонов)
+  const sortControl = (
+    <div className="mb-4 flex flex-col gap-2 min-[480px]:items-end">
+      <button
+        ref={sortButtonRef}
+        type="button"
+        onClick={() => setIsSortOpen((current) => !current)}
+        className="inline-flex min-h-10 w-full flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:border-brand-main hover:text-brand-main min-[480px]:w-auto min-[480px]:justify-start"
+        aria-haspopup="menu"
+        aria-expanded={isSortOpen}
+      >
+        <span>Сортировка</span>
+        <span className="text-brand-main">{sortLabel}</span>
+        <span aria-hidden="true">▾</span>
+      </button>
+
+      <Popover
+        anchorRef={sortButtonRef}
+        isOpen={isSortOpen}
+        onClose={() => setIsSortOpen(false)}
+        needTriangle={false}
+        padding={12}
+      >
+        <div
+          className="flex w-[calc(100vw-2rem)] min-[360px]:w-64 flex-col gap-1"
+          role="menu"
+        >
+          {SORT_OPTIONS.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              role="menuitemradio"
+              aria-checked={option.value === sort}
+              onClick={() => handleSortChange(option.value)}
+              className={clsx(
+                "w-full rounded-lg px-3 py-2 text-left text-sm transition",
+                option.value === sort
+                  ? "bg-brand-main text-white"
+                  : "text-slate-700 hover:bg-slate-100",
+              )}
+            >
+              {option.label}
+            </button>
+          ))}
+        </div>
+      </Popover>
+    </div>
+  )
+
   if (isLoading) {
     return (
-      <div className={gridClassName}>
-        {[...Array(6)].map((_, index) => (
-          <ProductCardSkeleton key={index} />
-        ))}
-      </div>
+      <>
+        {sortControl}
+        <div className={gridClassName}>
+          {[...Array(6)].map((_, index) => (
+            <ProductCardSkeleton key={index} />
+          ))}
+        </div>
+      </>
     )
   }
 
-  // 2. Состояние ошибки
   if (isError) {
     return (
-      <div className="py-10 text-center text-red-500">
-        Не удалось загрузить товары. Попробуйте обновить страницу.
-      </div>
+      <>
+        {sortControl}
+        <div className="py-10 text-center text-red-500">
+          Не удалось загрузить товары. Попробуйте обновить страницу.
+        </div>
+      </>
     )
   }
 
@@ -88,21 +168,23 @@ export const ProductList = () => {
 
   if (products.length === 0) {
     return (
-      <div className="py-20 text-center text-slate-500">
-        Товары не найдены. Попробуйте сбросить фильтры.
-      </div>
+      <>
+        {sortControl}
+        <div className="py-20 text-center text-slate-500">
+          Товары не найдены. Попробуйте сбросить фильтры.
+        </div>
+      </>
     )
   }
 
-  // 3. Успешный результат
   return (
-    <div className={gridClassName}>
-      {products.map((product) => (
-        // Проверь, что в объекте точно есть name, price и image!
-        // Если в консоли они называются api_price, передавай их так:
-        // <ProductCard key={product.id} product={{...product, price: product.api_price}} />
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </div>
+    <>
+      {sortControl}
+      <div className={gridClassName}>
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </>
   )
 }

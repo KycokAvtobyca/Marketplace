@@ -3,9 +3,9 @@ import { FilterPropertiesData } from "./routesInterfaces"
 type Prefixed<T> = {
   [K in keyof T]: T[K] extends string
     ? string
-    : T[K] extends (...args: any[]) => string
-      ? (...args: Parameters<T[K]>) => string
-      : T[K] extends object
+    : T[K] extends (...args: infer Args) => string
+      ? (...args: Args) => string
+      : T[K] extends Record<string, unknown>
         ? Prefixed<T[K]>
         : T[K]
 }
@@ -13,11 +13,11 @@ type Prefixed<T> = {
 const BASE_URL = "/"
 
 // Вспомогательная функция для автоматического добавления префикса
-function withPrefix<T extends Record<string, any>>(
+function withPrefix<T extends Record<string, unknown>>(
   prefix: string,
   routes: T,
 ): Prefixed<T> {
-  const result = {} as any
+  const result: Record<string, unknown> = {}
 
   for (const key in routes) {
     const value = routes[key]
@@ -25,15 +25,16 @@ function withPrefix<T extends Record<string, any>>(
     if (typeof value === "string") {
       result[key] = prefix + value
     } else if (typeof value === "function") {
-      result[key] = (...args: any[]) => prefix + value(...args)
+      const routeFactory = value as (...args: unknown[]) => string
+      result[key] = (...args: unknown[]) => prefix + routeFactory(...args)
     } else if (typeof value === "object" && value !== null) {
-      result[key] = withPrefix(prefix, value)
+      result[key] = withPrefix(prefix, value as Record<string, unknown>)
     } else {
       result[key] = value
     }
   }
 
-  return result
+  return result as Prefixed<T>
 }
 
 const CATALOG_BASE_URL = BASE_URL + "catalog/"
@@ -176,6 +177,8 @@ const CART_APP_ROUTES = {
   ADD_ITEM: "add_item/",
   UPDATE_ITEM: "update_item/",
   REMOVE_ITEM: "remove_item/",
+  APPLY_PROMOCODE: "apply_promocode/",
+  REMOVE_PROMOCODE: "remove_promocode/",
   CLEAR: "clear/",
 }
 
@@ -200,5 +203,15 @@ export const ROUTES = {
   ORDERS: {
     ROOT: BASE_URL + "orders/",
     CREATE: BASE_URL + "orders/create/",
+    CANCEL: (id: number) => BASE_URL + `orders/${id}/cancel/`,
+  },
+
+  REVIEWS: {
+    ROOT: BASE_URL + "reviews/",
+    RETRIEVE: (id: number) => BASE_URL + `reviews/${id}/`,
+    VOTE: (id: number) => BASE_URL + `reviews/${id}/vote/`,
+    QUESTIONS: BASE_URL + "reviews/questions/",
+    QUESTION_RETRIEVE: (id: number) => BASE_URL + `reviews/questions/${id}/`,
+    QUESTION_ANSWER: (id: number) => BASE_URL + `reviews/questions/${id}/answer/`,
   },
 } as const
