@@ -105,8 +105,34 @@ class ShopOwnerAdminMixin:
         return super().formfield_for_foreignkey(db_field, request, **kwargs)
 
 
+class ShopReferenceAdminMixin:
+    """Allow shop staff to read shared catalog dictionaries via autocomplete."""
+
+    def _is_shop_staff(self, request):
+        return (
+            request.user.is_staff
+            and hasattr(request.user, "shop")
+            and request.user.shop.exists()
+        )
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser or self._is_shop_staff(request)
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
 @admin.register(models.Category)
-class CategoryAdmin(admin.ModelAdmin):
+class CategoryAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("name", "parent", "level")
     search_fields = ("name",)
     list_filter = ("level",)
@@ -120,7 +146,7 @@ class CategoryAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.Brand)
-class BrandAdmin(admin.ModelAdmin):
+class BrandAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}
@@ -131,7 +157,7 @@ class BrandAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.ProductTag)
-class ProductTagAdmin(admin.ModelAdmin):
+class ProductTagAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}
@@ -141,7 +167,7 @@ class ProductTagAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.ProductType)
-class ProductTypeAdmin(admin.ModelAdmin):
+class ProductTypeAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("name",)
     search_fields = ("name",)
     prepopulated_fields = {"slug": ("name",)}
@@ -151,7 +177,7 @@ class ProductTypeAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.Attribute)
-class AttributeAdmin(admin.ModelAdmin):
+class AttributeAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("name", "is_active")
     search_fields = ("name",)
     list_filter = ("is_active",)
@@ -162,7 +188,7 @@ class AttributeAdmin(admin.ModelAdmin):
 
 
 @admin.register(models.AttributeValue)
-class AttributeValueAdmin(admin.ModelAdmin):
+class AttributeValueAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
     list_display = ("value", "attribute")
     search_fields = ("value", "attribute__name")
     list_filter = ("attribute",)

@@ -78,6 +78,10 @@ interface FilterListProps {
   nestingLevel?: number
   parentPath?: string
   isSidebar?: boolean
+  loadMore?: {
+    isLoading: boolean
+    onClick: () => void
+  }
 }
 
 export const FilterList: React.FC<FilterListProps> = ({
@@ -86,6 +90,7 @@ export const FilterList: React.FC<FilterListProps> = ({
   isSidebar = false,
   hasParent = false,
   parentPath,
+  loadMore,
 }) => {
   if (!object) return null
 
@@ -93,27 +98,42 @@ export const FilterList: React.FC<FilterListProps> = ({
   const currentPath = parentPath || object.slug
 
   const renderContent = () => {
-    return sortChildrenFirst(children).map((child, idx) => {
-      if (hasChildren(child)) {
-        return (
-          <FilterList
-            key={child.slug || child.id || idx}
-            object={child}
-            isSidebar={isSidebar}
-            hasParent={true}
-            parentPath={currentPath}
-          />
-        )
-      }
+    return (
+      <>
+        {sortChildrenFirst(children).map((child, idx) => {
+          if (hasChildren(child)) {
+            return (
+              <FilterList
+                key={child.slug || child.id || idx}
+                object={child}
+                isSidebar={isSidebar}
+                hasParent={true}
+                parentPath={currentPath}
+              />
+            )
+          }
 
-      return (
-        <FilterLeaf
-          key={child.slug || child.id || idx}
-          object={child}
-          path={currentPath}
-        />
-      )
-    })
+          return (
+            <FilterLeaf
+              key={child.slug || child.id || idx}
+              object={child}
+              path={currentPath}
+            />
+          )
+        })}
+        {loadMore && (
+          <button
+            type="button"
+            onClick={loadMore.onClick}
+            disabled={loadMore.isLoading}
+            className="mt-2 w-full rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-brand-main transition hover:border-brand-main disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {loadMore.isLoading ? "Загрузка..." : "Показать еще"}
+          </button>
+        )
+        }
+      </>
+    )
   }
 
   return (

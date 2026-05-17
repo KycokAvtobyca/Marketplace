@@ -10,8 +10,10 @@ import { useProfile } from "@/entities/user/api/useProfile"
 import { useAuthWindowStore } from "@/entities/authWindow"
 import {
   useAnswerProductQuestion,
+  useCreateProductComplaint,
   useCreateProductQuestion,
   useCreateReview,
+  useCreateReviewComplaint,
   useDeleteReview,
   useProductQuestions,
   useProductReviews,
@@ -44,6 +46,10 @@ export default function ProductPage() {
     useCreateProductQuestion(id)
   const { mutate: answerQuestion, isPending: isAnsweringQuestion } =
     useAnswerProductQuestion(id)
+  const { mutate: createProductComplaint, isPending: isReportingProduct } =
+    useCreateProductComplaint()
+  const { mutate: createReviewComplaint, isPending: isReportingReview } =
+    useCreateReviewComplaint()
   const { mutate: addToCart, isPending: isAdding } = useAddToCart()
   const queryClient = useQueryClient()
   const { data: profile } = useProfile()
@@ -60,6 +66,22 @@ export default function ProductPage() {
   const [questionText, setQuestionText] = useState("")
   const [questionMessage, setQuestionMessage] = useState("")
   const [answerDrafts, setAnswerDrafts] = useState<Record<number, string>>({})
+  const [productComplaintOpen, setProductComplaintOpen] = useState(false)
+  const [productComplaintReason, setProductComplaintReason] = useState("OTHER")
+  const [productComplaintText, setProductComplaintText] = useState("")
+  const [productComplaintMessage, setProductComplaintMessage] = useState("")
+  const [reviewComplaintOpen, setReviewComplaintOpen] = useState<
+    Record<number, boolean>
+  >({})
+  const [reviewComplaintReason, setReviewComplaintReason] = useState<
+    Record<number, string>
+  >({})
+  const [reviewComplaintText, setReviewComplaintText] = useState<
+    Record<number, string>
+  >({})
+  const [reviewComplaintMessage, setReviewComplaintMessage] = useState<
+    Record<number, string>
+  >({})
 
   const mainVariant =
     product?.variants.find((variant) => variant.is_main) || product?.variants[0]
@@ -207,6 +229,74 @@ export default function ProductPage() {
         setQuestionMessage("Не удалось отправить вопрос.")
       },
     })
+  }
+
+  const handleProductComplaintSubmit = (event: React.FormEvent) => {
+    event.preventDefault()
+    setProductComplaintMessage("")
+    if (!profile) {
+      toggleAuthWindow()
+      return
+    }
+
+    createProductComplaint(
+      {
+        product: id,
+        reason: productComplaintReason as "SPAM" | "OFFENSIVE" | "FAKE" | "PROHIBITED" | "OTHER",
+        text: productComplaintText,
+      },
+      {
+        onSuccess: () => {
+          setProductComplaintText("")
+          setProductComplaintOpen(false)
+          setProductComplaintMessage("Жалоба отправлена на проверку.")
+        },
+        onError: () => {
+          setProductComplaintMessage("Не удалось отправить жалобу.")
+        },
+      },
+    )
+  }
+
+  const handleReviewComplaintSubmit = (
+    event: React.FormEvent,
+    reviewId: number,
+  ) => {
+    event.preventDefault()
+    setReviewComplaintMessage((prev) => ({ ...prev, [reviewId]: "" }))
+    if (!profile) {
+      toggleAuthWindow()
+      return
+    }
+
+    createReviewComplaint(
+      {
+        review: reviewId,
+        reason: (reviewComplaintReason[reviewId] || "OTHER") as
+          | "SPAM"
+          | "OFFENSIVE"
+          | "FAKE"
+          | "PROHIBITED"
+          | "OTHER",
+        text: reviewComplaintText[reviewId] || "",
+      },
+      {
+        onSuccess: () => {
+          setReviewComplaintText((prev) => ({ ...prev, [reviewId]: "" }))
+          setReviewComplaintOpen((prev) => ({ ...prev, [reviewId]: false }))
+          setReviewComplaintMessage((prev) => ({
+            ...prev,
+            [reviewId]: "Жалоба отправлена на проверку.",
+          }))
+        },
+        onError: () => {
+          setReviewComplaintMessage((prev) => ({
+            ...prev,
+            [reviewId]: "Не удалось отправить жалобу.",
+          }))
+        },
+      },
+    )
   }
 
   if (isLoading) {
@@ -468,6 +558,58 @@ export default function ProductPage() {
                 <p className="font-medium">{product.shop.name}</p>
               </div>
             )}
+
+            <div className="rounded-xl border border-slate-100 p-3">
+              <button
+                type="button"
+                onClick={() => setProductComplaintOpen((current) => !current)}
+                className="text-sm font-semibold text-red-600 hover:underline"
+              >
+                Пожаловаться на товар
+              </button>
+              {productComplaintMessage && (
+                <p className="mt-2 text-xs text-slate-500">
+                  {productComplaintMessage}
+                </p>
+              )}
+              {productComplaintOpen && (
+                <form
+                  onSubmit={handleProductComplaintSubmit}
+                  className="mt-3 space-y-2"
+                >
+                  <select
+                    value={productComplaintReason}
+                    onChange={(event) =>
+                      setProductComplaintReason(event.target.value)
+                    }
+                    className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-main"
+                  >
+                    <option value="PROHIBITED">Запрещенный товар или контент</option>
+                    <option value="FAKE">Недостоверная информация</option>
+                    <option value="SPAM">Спам</option>
+                    <option value="OFFENSIVE">Оскорбительный контент</option>
+                    <option value="OTHER">Другое</option>
+                  </select>
+                  <textarea
+                    value={productComplaintText}
+                    onChange={(event) =>
+                      setProductComplaintText(event.target.value)
+                    }
+                    rows={3}
+                    maxLength={2000}
+                    placeholder="Комментарий"
+                    className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-main"
+                  />
+                  <button
+                    type="submit"
+                    disabled={isReportingProduct}
+                    className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                  >
+                    {isReportingProduct ? "Отправка..." : "Отправить жалобу"}
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
 
@@ -643,7 +785,70 @@ export default function ProductPage() {
                           </button>
                         </>
                       )}
+                      {!isOwner && (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setReviewComplaintOpen((prev) => ({
+                              ...prev,
+                              [review.id]: !prev[review.id],
+                            }))
+                          }
+                          className="text-red-600 hover:underline min-[520px]:ml-auto"
+                        >
+                          Пожаловаться
+                        </button>
+                      )}
                     </div>
+                    {reviewComplaintMessage[review.id] && (
+                      <p className="mt-2 text-xs text-slate-500">
+                        {reviewComplaintMessage[review.id]}
+                      </p>
+                    )}
+                    {reviewComplaintOpen[review.id] && (
+                      <form
+                        onSubmit={(event) =>
+                          handleReviewComplaintSubmit(event, review.id)
+                        }
+                        className="mt-3 space-y-2 rounded-xl bg-slate-50 p-3"
+                      >
+                        <select
+                          value={reviewComplaintReason[review.id] || "OTHER"}
+                          onChange={(event) =>
+                            setReviewComplaintReason((prev) => ({
+                              ...prev,
+                              [review.id]: event.target.value,
+                            }))
+                          }
+                          className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-main"
+                        >
+                          <option value="FAKE">Недостоверная информация</option>
+                          <option value="SPAM">Спам</option>
+                          <option value="OFFENSIVE">Оскорбительный контент</option>
+                          <option value="OTHER">Другое</option>
+                        </select>
+                        <textarea
+                          value={reviewComplaintText[review.id] || ""}
+                          onChange={(event) =>
+                            setReviewComplaintText((prev) => ({
+                              ...prev,
+                              [review.id]: event.target.value,
+                            }))
+                          }
+                          rows={3}
+                          maxLength={2000}
+                          placeholder="Комментарий"
+                          className="w-full resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-main"
+                        />
+                        <button
+                          type="submit"
+                          disabled={isReportingReview}
+                          className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
+                        >
+                          {isReportingReview ? "Отправка..." : "Отправить жалобу"}
+                        </button>
+                      </form>
+                    )}
                   </article>
                 )
               })

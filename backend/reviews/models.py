@@ -270,3 +270,134 @@ class ReviewImage(models.Model):
     class Meta:
         verbose_name = "Изображение отзыва"
         verbose_name_plural = "Изображения отзывов"
+
+
+class Report(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class TargetType(models.TextChoices):
+        REVIEW = "REVIEW", "Отзыв"
+        PRODUCT = "PRODUCT", "Товар"
+
+    class Reason(models.TextChoices):
+        SPAM = "SPAM", "Спам или реклама"
+        OFFENSIVE = "OFFENSIVE", "Оскорбления или недопустимый контент"
+        FAKE = "FAKE", "Поддельный/фейковый отзыв или товар"
+        WRONG_PRODUCT = "WRONG_PRODUCT", "Товар не соответствует описанию"
+        OTHER = "OTHER", "Другое"
+
+    class Status(models.TextChoices):
+        PENDING = "PENDING", "На рассмотрении"
+        RESOLVED = "RESOLVED", "Решена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    target_type = models.CharField(
+        "Тип объекта", max_length=20, choices=TargetType.choices
+    )
+    target_id = models.PositiveIntegerField("ID объекта")
+    reason = models.CharField("Причина", max_length=30, choices=Reason.choices)
+    description = models.TextField(
+        "Описание", max_length=2000, blank=True, validators=[MinLengthValidator(5)]
+    )
+    status = models.CharField(
+        "Статус", max_length=15, choices=Status.choices, default=Status.PENDING
+    )
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="reports",
+        verbose_name="Автор жалобы",
+    )
+
+    class Meta:
+        verbose_name = "Жалоба"
+        verbose_name_plural = "Жалобы"
+        ordering = ["-date_time_create"]
+        indexes = [
+            models.Index(fields=["target_type", "target_id", "status"]),
+            models.Index(fields=["status", "-date_time_create"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["user", "target_type", "target_id"],
+                name="unique_user_report_per_target",
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.get_target_type_display()} #{self.target_id}"
+
+
+class ComplaintBase(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Reason(models.TextChoices):
+        SPAM = "SPAM", "Спам"
+        OFFENSIVE = "OFFENSIVE", "Оскорбительный контент"
+        FAKE = "FAKE", "Недостоверная информация"
+        PROHIBITED = "PROHIBITED", "Запрещенный товар или контент"
+        OTHER = "OTHER", "Другое"
+
+    class Status(models.TextChoices):
+        NEW = "NEW", "Новая"
+        IN_REVIEW = "IN_REVIEW", "На проверке"
+        RESOLVED = "RESOLVED", "Решена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="%(class)s_complaints",
+        verbose_name="Автор жалобы",
+    )
+    reason = models.CharField("Причина", max_length=20, choices=Reason.choices)
+    text = models.TextField("Комментарий", max_length=2000, blank=True)
+    status = models.CharField(
+        "Статус", max_length=20, choices=Status.choices, default=Status.NEW
+    )
+
+    class Meta:
+        abstract = True
+        ordering = ["-date_time_create", "-id"]
+
+
+class ReviewComplaint(ComplaintBase):
+    review = models.ForeignKey(
+        Review,
+        on_delete=models.CASCADE,
+        related_name="complaints",
+        verbose_name="Отзыв",
+    )
+
+    class Meta(ComplaintBase.Meta):
+        verbose_name = "Жалоба на отзыв"
+        verbose_name_plural = "Жалобы на отзывы"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["review", "user"],
+                name="unique_review_complaint_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"Жалоба на отзыв #{self.review_id}"
+
+
+class ProductComplaint(ComplaintBase):
+    product = models.ForeignKey(
+        "catalog.Product",
+        on_delete=models.CASCADE,
+        related_name="complaints",
+        verbose_name="Товар",
+    )
+
+    class Meta(ComplaintBase.Meta):
+        verbose_name = "Жалоба на товар"
+        verbose_name_plural = "Жалобы на товары"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["product", "user"],
+                name="unique_product_complaint_per_user",
+            )
+        ]
+
+    def __str__(self):
+        return f"Жалоба на товар #{self.product_id}"

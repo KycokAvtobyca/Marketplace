@@ -6,8 +6,13 @@ from rest_framework.response import Response
 
 from catalog.pagination import DefaultCursorPagination
 
-from .models import ProductQuestion, Review, ReviewVote
-from .serializers import ProductQuestionSerializer, ReviewSerializer
+from .models import ProductComplaint, ProductQuestion, Review, ReviewComplaint, ReviewVote
+from .serializers import (
+    ProductComplaintSerializer,
+    ProductQuestionSerializer,
+    ReviewComplaintSerializer,
+    ReviewSerializer,
+)
 
 
 class ReviewPermission(permissions.BasePermission):
@@ -173,3 +178,46 @@ class ProductQuestionViewSet(viewsets.ModelViewSet):
         return Response(
             ProductQuestionSerializer(question, context={"request": request}).data
         )
+
+
+class ComplaintPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if request.method == "POST":
+            return bool(request.user and request.user.is_authenticated)
+        return bool(request.user and request.user.is_staff)
+
+
+class ReviewComplaintViewSet(viewsets.ModelViewSet):
+    serializer_class = ReviewComplaintSerializer
+    permission_classes = [ComplaintPermission]
+    pagination_class = DefaultCursorPagination
+
+    def get_queryset(self):
+        qs = ReviewComplaint.objects.select_related(
+            "user",
+            "review",
+            "review__product_variant__product",
+        )
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        shop = user.shop.first() if user.is_staff else None
+        if shop:
+            return qs.filter(review__product_variant__product__shop=shop)
+        return qs.none()
+
+
+class ProductComplaintViewSet(viewsets.ModelViewSet):
+    serializer_class = ProductComplaintSerializer
+    permission_classes = [ComplaintPermission]
+    pagination_class = DefaultCursorPagination
+
+    def get_queryset(self):
+        qs = ProductComplaint.objects.select_related("user", "product", "product__shop")
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+        shop = user.shop.first() if user.is_staff else None
+        if shop:
+            return qs.filter(product__shop=shop)
+        return qs.none()

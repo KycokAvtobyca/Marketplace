@@ -33,6 +33,13 @@ export interface ProductQuestion {
   date_time_create: string
 }
 
+export type ComplaintReason =
+  | "SPAM"
+  | "OFFENSIVE"
+  | "FAKE"
+  | "PROHIBITED"
+  | "OTHER"
+
 export const useProductReviews = (productId: number) => {
   return useQuery<Review[]>({
     queryKey: ["reviews", "product", productId],
@@ -167,6 +174,32 @@ export const useAnswerProductQuestion = (productId: number) => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["questions", "product", productId] })
+    },
+  })
+}
+
+export const useCreateReviewComplaint = () => {
+  return useMutation({
+    mutationFn: async (payload: {
+      review: number
+      reason: ComplaintReason
+      text?: string
+    }) => {
+      const { data } = await api.post(ROUTES.REVIEWS.REVIEW_COMPLAINTS, payload)
+      return data
+    },
+  })
+}
+
+export const useCreateProductComplaint = () => {
+  return useMutation({
+    mutationFn: async (payload: {
+      product: number
+      reason: ComplaintReason
+      text?: string
+    }) => {
+      const { data } = await api.post(ROUTES.REVIEWS.PRODUCT_COMPLAINTS, payload)
+      return data
     },
   })
 }

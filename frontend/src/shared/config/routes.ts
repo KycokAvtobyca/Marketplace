@@ -210,6 +210,8 @@ export const ROUTES = {
     ROOT: BASE_URL + "reviews/",
     RETRIEVE: (id: number) => BASE_URL + `reviews/${id}/`,
     VOTE: (id: number) => BASE_URL + `reviews/${id}/vote/`,
+    REVIEW_COMPLAINTS: BASE_URL + "reviews/review-complaints/",
+    PRODUCT_COMPLAINTS: BASE_URL + "reviews/product-complaints/",
     QUESTIONS: BASE_URL + "reviews/questions/",
     QUESTION_RETRIEVE: (id: number) => BASE_URL + `reviews/questions/${id}/`,
     QUESTION_ANSWER: (id: number) => BASE_URL + `reviews/questions/${id}/answer/`,

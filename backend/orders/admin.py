@@ -1,4 +1,5 @@
 from django.contrib import admin
+from django.core.exceptions import ValidationError
 
 from . import models
 
@@ -31,6 +32,11 @@ class OrderItemInline(admin.TabularInline):
 
 @admin.register(models.Order)
 class OrderAdmin(admin.ModelAdmin):
+    CLOSED_STATUSES = {
+        models.Order.Status.COMPLETED,
+        models.Order.Status.PAID,
+        models.Order.Status.CANCELED,
+    }
     list_display = (
         "id",
         "user",
@@ -135,7 +141,24 @@ class OrderAdmin(admin.ModelAdmin):
     def get_readonly_fields(self, request, obj=None):
         if request.user.is_superuser:
             return self.readonly_fields
+        if obj and obj.status in self.CLOSED_STATUSES:
+            return ("status",)
         return ()
+
+    def save_model(self, request, obj, form, change):
+        if (
+            change
+            and not request.user.is_superuser
+            and obj.pk
+            and "status" in form.changed_data
+        ):
+            old_status = type(obj).objects.only("status").get(pk=obj.pk).status
+            if old_status in self.CLOSED_STATUSES and obj.status != old_status:
+                raise ValidationError(
+                    "Закрытый заказ нельзя снова сделать активным для магазина."
+                )
+
+        super().save_model(request, obj, form, change)
 
     def has_delete_permission(self, request, obj=None):
         return request.user.is_superuser

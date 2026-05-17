@@ -6,7 +6,7 @@ from orders.models import Order, OrderItem
 from rest_framework.test import APIClient
 from users.models import CustomUser, Shop
 
-from .models import Review
+from .models import ProductComplaint, Review, ReviewComplaint
 
 
 class ReviewApiTests(TestCase):
@@ -147,3 +147,44 @@ class ReviewApiTests(TestCase):
         response = client.get(f"/api/v1/reviews/?product={self.product.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
+
+    def test_authenticated_user_can_report_review_and_product_once(self):
+        self._completed_order()
+        review = Review.objects.create(
+            user=self.user,
+            product_variant=self.variant,
+            rating=5,
+            description="Очень хороший тестовый товар",
+            status=Review.Status.APPROVED,
+            is_verified_purchase=True,
+        )
+
+        client = APIClient()
+        client.force_authenticate(user=self.other_user)
+
+        response = client.post(
+            "/api/v1/reviews/review-complaints/",
+            {"review": review.pk, "reason": "FAKE", "text": "Сомнительный отзыв"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(ReviewComplaint.objects.count(), 1)
+
+        duplicate = client.post(
+            "/api/v1/reviews/review-complaints/",
+            {"review": review.pk, "reason": "FAKE"},
+            format="json",
+        )
+        self.assertEqual(duplicate.status_code, 400)
+
+        response = client.post(
+            "/api/v1/reviews/product-complaints/",
+            {
+                "product": self.product.pk,
+                "reason": "PROHIBITED",
+                "text": "Нужно проверить товар",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(ProductComplaint.objects.count(), 1)

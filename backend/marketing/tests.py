@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 from django.test import TestCase
-from users.models import CustomUser, Shop
+from users.models import CustomUser, Shop, UserSegment
 
 from .models import Discount, PromoCode
 
@@ -140,6 +140,48 @@ class PromoCodeLogicTests(TestCase):
 
         self.assertEqual(variant.discount_pct, Decimal("0"))
         self.assertEqual(variant.final_price, Decimal("1000.00"))
+
+    def test_segment_discount_applies_only_to_segment_users(self):
+        segment = UserSegment.objects.create(name="VIP")
+        segment.users.add(self.user)
+        other_user = CustomUser.objects.create_user("89642297625")
+
+        Discount.objects.create(
+            name="VIP discount",
+            is_active=True,
+            is_global=False,
+            segment=segment,
+            discount_percentage=Decimal("0.25"),
+        )
+
+        vip_variant = ProductVariant.objects.with_prices(user=self.user).get(
+            pk=self.variant.pk
+        )
+        regular_variant = ProductVariant.objects.with_prices(user=other_user).get(
+            pk=self.variant.pk
+        )
+
+        self.assertEqual(vip_variant.discount_pct, Decimal("0.25"))
+        self.assertEqual(vip_variant.final_price, Decimal("750.0000"))
+        self.assertEqual(regular_variant.discount_pct, Decimal("0"))
+        self.assertEqual(regular_variant.final_price, Decimal("1000.00"))
+
+    def test_segment_promocode_applies_only_to_segment_users(self):
+        segment = UserSegment.objects.create(name="Promo VIP")
+        segment.users.add(self.user)
+        other_user = CustomUser.objects.create_user("89642297626")
+        promo = self._promocode(
+            code="VIPCODE",
+            is_global=False,
+            segment=segment,
+        )
+
+        self.assertTrue(
+            promo.can_use_check(user=self.user, order_total=Decimal("2000.00"))[0]
+        )
+        self.assertFalse(
+            promo.can_use_check(user=other_user, order_total=Decimal("2000.00"))[0]
+        )
 
     def test_shop_owner_can_create_promocode_only_for_own_product(self):
         client = APIClient()

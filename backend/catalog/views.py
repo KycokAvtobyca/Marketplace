@@ -450,7 +450,6 @@ class FiltersViewSet(viewsets.ViewSet):
             s.ProductTypeSerializer,
             prefix="product_tag",
             name="Тип товара",
-            limit=1000,
         )
 
     # ------

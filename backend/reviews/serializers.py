@@ -1,7 +1,7 @@
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import ProductQuestion, Review, ReviewImage
+from .models import ProductComplaint, ProductQuestion, Review, ReviewComplaint, ReviewImage
 
 
 class ReviewImageSerializer(serializers.ModelSerializer):
@@ -138,3 +138,69 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context["request"]
         return ProductQuestion.objects.create(user=request.user, **validated_data)
+
+
+class ReviewComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ReviewComplaint
+        fields = [
+            "id",
+            "review",
+            "reason",
+            "text",
+            "status",
+            "date_time_create",
+            "date_time_update",
+        ]
+        read_only_fields = ["id", "status", "date_time_create", "date_time_update"]
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        review = attrs.get("review")
+        if ReviewComplaint.objects.filter(
+            user=request.user,
+            review=review,
+        ).exists():
+            raise serializers.ValidationError(
+                {"review": "Вы уже отправили жалобу на этот отзыв."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        return ReviewComplaint.objects.create(
+            user=self.context["request"].user,
+            **validated_data,
+        )
+
+
+class ProductComplaintSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ProductComplaint
+        fields = [
+            "id",
+            "product",
+            "reason",
+            "text",
+            "status",
+            "date_time_create",
+            "date_time_update",
+        ]
+        read_only_fields = ["id", "status", "date_time_create", "date_time_update"]
+
+    def validate(self, attrs):
+        request = self.context["request"]
+        product = attrs.get("product")
+        if ProductComplaint.objects.filter(
+            user=request.user,
+            product=product,
+        ).exists():
+            raise serializers.ValidationError(
+                {"product": "Вы уже отправили жалобу на этот товар."}
+            )
+        return attrs
+
+    def create(self, validated_data):
+        return ProductComplaint.objects.create(
+            user=self.context["request"].user,
+            **validated_data,
+        )

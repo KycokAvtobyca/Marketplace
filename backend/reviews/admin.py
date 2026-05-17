@@ -46,3 +46,19 @@ class ProductQuestionAdmin(admin.ModelAdmin):
     list_filter = ("is_public", "answered_at", "date_time_create")
     readonly_fields = ("user", "date_time_create", "date_time_update", "answered_at")
     autocomplete_fields = ("product",)
+
+
+@admin.register(models.ReviewComplaint)
+class ReviewComplaintAdmin(admin.ModelAdmin):
+    list_display = ("id", "review", "user", "reason", "status", "date_time_create")
+    search_fields = ("review__id", "user__phone_number", "text")
+    list_filter = ("reason", "status", "date_time_create")
+    readonly_fields = ("review", "user", "reason", "text", "date_time_create", "date_time_update")
+
+
+@admin.register(models.ProductComplaint)
+class ProductComplaintAdmin(admin.ModelAdmin):
+    list_display = ("id", "product", "user", "reason", "status", "date_time_create")
+    search_fields = ("product__name", "user__phone_number", "text")
+    list_filter = ("reason", "status", "date_time_create")
+    readonly_fields = ("product", "user", "reason", "text", "date_time_create", "date_time_update")

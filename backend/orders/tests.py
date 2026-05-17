@@ -2,11 +2,15 @@ from decimal import Decimal
 from unittest.mock import patch
 
 from catalog.models import Product, ProductVariant
+from django.contrib import admin
+from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import Client, TestCase
+from types import SimpleNamespace
 from users.models import CustomUser, Shop
 
 from .models import Order, OrderItem
+from .admin import OrderAdmin
 
 
 class AdminPdfReportTests(TestCase):
@@ -121,3 +125,19 @@ class AdminPdfReportTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response["Content-Type"], "application/pdf")
         self.assertTrue(response.content.startswith(b"%PDF"))
+
+    def test_seller_cannot_reopen_closed_order_in_admin(self):
+        self.order.status = Order.Status.PAID
+        self.order.save(update_fields=["status"])
+
+        admin_model = OrderAdmin(Order, admin.site)
+        request = SimpleNamespace(user=self.seller)
+        self.order.status = Order.Status.CREATED
+
+        with self.assertRaises(ValidationError):
+            admin_model.save_model(
+                request,
+                self.order,
+                SimpleNamespace(changed_data=["status"]),
+                True,
+            )
