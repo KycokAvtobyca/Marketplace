@@ -5,6 +5,7 @@ from .models import (
     Attribute,
     AttributeValue,
     Brand,
+    CatalogItemRequest,
     Category,
     Product,
     ProductTag,
@@ -121,6 +122,89 @@ class ProductTypeSerializer(serializers.ModelSerializer):
     class Meta:
         model = ProductType
         exclude = ["id"]
+
+
+class CatalogItemRequestSerializer(serializers.ModelSerializer):
+    target_type_display = serializers.CharField(
+        source="get_target_type_display", read_only=True
+    )
+    status_display = serializers.CharField(source="get_status_display", read_only=True)
+    shop_name = serializers.CharField(source="shop.name", read_only=True)
+    parent_category_name = serializers.CharField(
+        source="parent_category.name", read_only=True
+    )
+    created_object = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CatalogItemRequest
+        fields = [
+            "id",
+            "target_type",
+            "target_type_display",
+            "name",
+            "parent_category",
+            "parent_category_name",
+            "comment",
+            "status",
+            "status_display",
+            "admin_comment",
+            "shop_name",
+            "created_object",
+            "date_time_create",
+            "date_time_update",
+        ]
+        read_only_fields = [
+            "id",
+            "target_type_display",
+            "status",
+            "status_display",
+            "admin_comment",
+            "shop_name",
+            "created_object",
+            "date_time_create",
+            "date_time_update",
+        ]
+
+    def get_created_object(self, obj):
+        created_obj = obj.created_object
+        if not created_obj:
+            return None
+        return {
+            "id": created_obj.pk,
+            "name": created_obj.name,
+            "slug": getattr(created_obj, "slug", ""),
+        }
+
+    def validate(self, attrs):
+        target_type = attrs.get(
+            "target_type", getattr(self.instance, "target_type", None)
+        )
+        parent_category = attrs.get(
+            "parent_category", getattr(self.instance, "parent_category", None)
+        )
+
+        if (
+            target_type != CatalogItemRequest.TargetType.CATEGORY
+            and parent_category
+        ):
+            raise serializers.ValidationError(
+                {
+                    "parent_category": "Родительскую категорию можно указать только для заявки на категорию."
+                }
+            )
+
+        if (
+            target_type == CatalogItemRequest.TargetType.CATEGORY
+            and parent_category
+            and parent_category.level >= 2
+        ):
+            raise serializers.ValidationError(
+                {
+                    "parent_category": "Новая категория не может быть глубже третьего уровня."
+                }
+            )
+
+        return attrs
 
 
 class ProductVariantSerializer(serializers.ModelSerializer):

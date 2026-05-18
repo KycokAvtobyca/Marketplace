@@ -141,3 +141,16 @@ class AdminPdfReportTests(TestCase):
                 SimpleNamespace(changed_data=["status"]),
                 True,
             )
+
+    def test_seller_cannot_set_paid_after_receipt_in_admin(self):
+        admin_model = OrderAdmin(Order, admin.site)
+        request = SimpleNamespace(user=self.seller)
+        self.order.status = Order.Status.PAID
+
+        with self.assertRaises(ValidationError):
+            admin_model.save_model(
+                request,
+                self.order,
+                SimpleNamespace(changed_data=["status"]),
+                True,
+            )

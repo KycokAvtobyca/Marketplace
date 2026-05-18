@@ -48,18 +48,30 @@ class CartViewSet(viewsets.GenericViewSet):
             return Response({"error": "Неверный формат количества"}, status=400)
 
         if quantity < 1:
-            return Response({"error": "Количество должно быть больше 0"}, status=400)
+            return Response(
+                {"error": "Количество должно быть больше 0"}, status=400
+            )
 
-        variant = get_object_or_404(ProductVariant, id=variant_id)
+        variant = get_object_or_404(
+            ProductVariant.objects.select_related("product__shop"),
+            id=variant_id,
+        )
+
+        # Проверяем, что пользователь не может добавить свой товар
+        if (
+            variant.product.shop
+            and variant.product.shop.owner_id == request.user.id
+        ):
+            return Response(
+                {"error": "Вы не можете добавить свой товар в корзину"},
+                status=400,
+            )
 
         # Проверяем, есть ли товар в наличии
         if variant.stock <= 0:
             ProductVariant.sync_main_for_product(variant.product_id)
             return Response(
-                {
-                    "error": "Товар отсутствует в наличии"
-                },
-                status=400
+                {"error": "Товар отсутствует в наличии"}, status=400
             )
 
         cart = self.get_cart()
@@ -107,22 +119,17 @@ class CartViewSet(viewsets.GenericViewSet):
 
         if quantity is None:
             return Response(
-                {"error": "Параметр 'quantity' обязателен"},
-                status=400
+                {"error": "Параметр 'quantity' обязателен"}, status=400
             )
 
         try:
             quantity = int(quantity)
             if quantity < 1:
                 return Response(
-                    {"error": "Количество должно быть больше 0"},
-                    status=400
+                    {"error": "Количество должно быть больше 0"}, status=400
                 )
         except (ValueError, TypeError):
-            return Response(
-                {"error": "Неверный формат количества"},
-                status=400
-            )
+            return Response({"error": "Неверный формат количества"}, status=400)
 
         item = get_object_or_404(CartItem, id=item_id, cart=self.get_cart())
         item.quantity = quantity
@@ -137,7 +144,7 @@ class CartViewSet(viewsets.GenericViewSet):
                 "message": "Обновлено",
                 "cart": CartSerializer(
                     self.get_cart(), context={"request": request}
-                ).data
+                ).data,
             }
         )
 
@@ -149,7 +156,9 @@ class CartViewSet(viewsets.GenericViewSet):
 
         promocode = PromoCode.objects.filter(code__iexact=code).first()
         if not promocode:
-            return Response({"promocode": "Промокод не существует."}, status=404)
+            return Response(
+                {"promocode": "Промокод не существует."}, status=404
+            )
 
         cart = self.get_cart()
         cart.promocode = promocode
@@ -159,7 +168,12 @@ class CartViewSet(viewsets.GenericViewSet):
             cart.full_clean()
             cart.save()
         except DjangoValidationError as exc:
-            return Response(exc.message_dict if hasattr(exc, "message_dict") else {"promocode": exc.messages[0]}, status=400)
+            return Response(
+                exc.message_dict
+                if hasattr(exc, "message_dict")
+                else {"promocode": exc.messages[0]},
+                status=400,
+            )
 
         cart = self.get_cart()
         return Response(

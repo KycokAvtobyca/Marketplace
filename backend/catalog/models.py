@@ -222,6 +222,179 @@ class ProductType(SlugifiedNameMixin):
         verbose_name_plural = "Типы продуктов"
 
 
+class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class TargetType(models.TextChoices):
+        PRODUCT_TYPE = "PRODUCT_TYPE", "Тип продукта"
+        CATEGORY = "CATEGORY", "Категория"
+        PRODUCT_TAG = "PRODUCT_TAG", "Тег продукта"
+
+    class Status(models.TextChoices):
+        NEW = "NEW", "Новая"
+        APPROVED = "APPROVED", "Одобрена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="catalog_item_requests",
+        verbose_name="Заявитель",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="catalog_item_requests",
+        verbose_name="Магазин",
+    )
+    target_type = models.CharField(
+        "Что создать",
+        max_length=20,
+        choices=TargetType.choices,
+    )
+    name = models.CharField(
+        "Название",
+        max_length=50,
+        validators=[MinLengthValidator(2)],
+    )
+    parent_category = TreeForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="catalog_item_requests",
+        verbose_name="Родительская категория",
+        help_text="Заполняется только для заявки на категорию.",
+    )
+    comment = models.TextField("Комментарий магазина", max_length=1000, blank=True)
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NEW,
+    )
+    admin_comment = models.TextField(
+        "Комментарий администратора", max_length=1000, blank=True
+    )
+    created_product_type = models.ForeignKey(
+        ProductType,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_requests",
+        verbose_name="Созданный тип продукта",
+    )
+    created_category = TreeForeignKey(
+        Category,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_catalog_requests",
+        verbose_name="Созданная категория",
+    )
+    created_product_tag = models.ForeignKey(
+        ProductTag,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_requests",
+        verbose_name="Созданный тег продукта",
+    )
+
+    class Meta:
+        ordering = ["-date_time_create", "-pk"]
+        verbose_name = "Заявка на справочник каталога"
+        verbose_name_plural = "Заявки на справочники каталога"
+        indexes = [
+            models.Index(fields=["status", "target_type", "-date_time_create"]),
+            models.Index(fields=["shop", "status"]),
+        ]
+
+    def __str__(self):
+        return f"{self.get_target_type_display()}: {self.name}"
+
+    @property
+    def created_object(self):
+        return (
+            self.created_product_type
+            or self.created_category
+            or self.created_product_tag
+        )
+
+    def clean(self):
+        super().clean()
+        self.name = (self.name or "").strip()
+
+        if (
+            self.target_type != self.TargetType.CATEGORY
+            and self.parent_category_id
+        ):
+            raise ValidationError(
+                {
+                    "parent_category": "Родительскую категорию можно указать только для заявки на категорию."
+                }
+            )
+
+        if (
+            self.target_type == self.TargetType.CATEGORY
+            and self.parent_category
+            and self.parent_category.level >= 2
+        ):
+            raise ValidationError(
+                {
+                    "parent_category": "Новая категория не может быть глубже третьего уровня."
+                }
+            )
+
+    def approve(self):
+        self.full_clean()
+
+        with transaction.atomic():
+            if self.target_type == self.TargetType.PRODUCT_TYPE:
+                obj = ProductType.objects.filter(name__iexact=self.name).first()
+                if obj is None:
+                    obj = ProductType.objects.create(name=self.name)
+                self.created_product_type = obj
+                self.created_category = None
+                self.created_product_tag = None
+
+            elif self.target_type == self.TargetType.CATEGORY:
+                obj = Category.objects.filter(
+                    parent=self.parent_category,
+                    name__iexact=self.name,
+                ).first()
+                if obj is None:
+                    obj = Category.objects.create(
+                        name=self.name,
+                        parent=self.parent_category,
+                    )
+                self.created_category = obj
+                self.created_product_type = None
+                self.created_product_tag = None
+
+            elif self.target_type == self.TargetType.PRODUCT_TAG:
+                obj = ProductTag.objects.filter(name__iexact=self.name).first()
+                if obj is None:
+                    obj = ProductTag.objects.create(name=self.name, is_active=True)
+                self.created_product_tag = obj
+                self.created_product_type = None
+                self.created_category = None
+
+            self.status = self.Status.APPROVED
+            self.save(
+                update_fields=[
+                    "status",
+                    "created_product_type",
+                    "created_category",
+                    "created_product_tag",
+                    "date_time_update",
+                ]
+            )
+
+        return self.created_object
+
+
 # Общая карточка
 class Product(DateTimeCreateMixin, DateTimeUpdateMixin, SlugMixin):
     name = models.CharField(

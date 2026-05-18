@@ -95,10 +95,18 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
         if not self.user_id or not self.product_variant_id:
             return False
 
+        # Разрешаем отзывы для всех статусов, при которых товар уже доставлен
+        allowed_statuses = [
+            Order.Status.DELIVERING,
+            Order.Status.READY_FOR_PICKUP,
+            Order.Status.COMPLETED,
+            Order.Status.PAID,
+        ]
+
         exists = OrderItem.objects.filter(
             order__user_id=self.user_id,
             product_variant_id=self.product_variant_id,
-            order__status=Order.Status.COMPLETED,
+            order__status__in=allowed_statuses,
         ).exists()
 
         return exists
@@ -210,7 +218,14 @@ class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
         self.answer = answer.strip()
         self.answered_by = user
         self.answered_at = timezone.now()
-        self.save(update_fields=["answer", "answered_by", "answered_at", "date_time_update"])
+        self.save(
+            update_fields=[
+                "answer",
+                "answered_by",
+                "answered_at",
+                "date_time_update",
+            ]
+        )
 
     def __str__(self):
         return f"Вопрос #{self.pk} к товару {self.product_id}"
@@ -295,7 +310,10 @@ class Report(DateTimeCreateMixin, DateTimeUpdateMixin):
     target_id = models.PositiveIntegerField("ID объекта")
     reason = models.CharField("Причина", max_length=30, choices=Reason.choices)
     description = models.TextField(
-        "Описание", max_length=2000, blank=True, validators=[MinLengthValidator(5)]
+        "Описание",
+        max_length=2000,
+        blank=True,
+        validators=[MinLengthValidator(5)],
     )
     status = models.CharField(
         "Статус", max_length=15, choices=Status.choices, default=Status.PENDING

@@ -1,4 +1,7 @@
 from django.contrib import admin
+from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.http import HttpResponseRedirect
 
 from . import models
 
@@ -219,7 +222,12 @@ class AttributeRequestAdmin(admin.ModelAdmin):
         "requester__phone_number",
     )
     autocomplete_fields = ("attribute",)
-    readonly_fields = ("requester", "shop", "date_time_create", "date_time_update")
+    readonly_fields = (
+        "requester",
+        "shop",
+        "date_time_create",
+        "date_time_update",
+    )
     list_per_page = 30
 
     def _get_user_shop(self, request):
@@ -230,8 +238,10 @@ class AttributeRequestAdmin(admin.ModelAdmin):
         return request.user.shop.first()
 
     def get_queryset(self, request):
-        qs = super().get_queryset(request).select_related(
-            "requester", "shop", "attribute"
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related("requester", "shop", "attribute")
         )
         if request.user.is_superuser:
             return qs
@@ -245,7 +255,9 @@ class AttributeRequestAdmin(admin.ModelAdmin):
         if not request.user.is_superuser:
             fields.extend(["status", "admin_comment"])
             if obj:
-                fields.extend(["attribute", "attribute_name", "value", "comment"])
+                fields.extend(
+                    ["attribute", "attribute_name", "value", "comment"]
+                )
         return tuple(dict.fromkeys(fields))
 
     def has_module_permission(self, request):
@@ -276,6 +288,137 @@ class AttributeRequestAdmin(admin.ModelAdmin):
         super().save_model(request, obj, form, change)
 
 
+@admin.register(models.CatalogItemRequest)
+class CatalogItemRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "target_type",
+        "name",
+        "shop",
+        "requester",
+        "status",
+        "created_object_display",
+        "date_time_create",
+    )
+    list_filter = ("target_type", "status", "date_time_create")
+    search_fields = (
+        "name",
+        "comment",
+        "admin_comment",
+        "shop__name",
+        "requester__phone_number",
+    )
+    autocomplete_fields = ("parent_category",)
+    readonly_fields = (
+        "requester",
+        "shop",
+        "created_product_type",
+        "created_category",
+        "created_product_tag",
+        "date_time_create",
+        "date_time_update",
+    )
+    actions = ("approve_requests",)
+    list_per_page = 30
+
+    def _get_user_shop(self, request):
+        if request.user.is_superuser:
+            return None
+        if not hasattr(request.user, "shop"):
+            return None
+        return request.user.shop.first()
+
+    @admin.display(description="Созданный объект")
+    def created_object_display(self, obj):
+        return obj.created_object or "-"
+
+    def get_queryset(self, request):
+        qs = (
+            super()
+            .get_queryset(request)
+            .select_related(
+                "requester",
+                "shop",
+                "parent_category",
+                "created_product_type",
+                "created_category",
+                "created_product_tag",
+            )
+        )
+        if request.user.is_superuser:
+            return qs
+        shop = self._get_user_shop(request)
+        if shop:
+            return qs.filter(shop=shop)
+        return qs.none()
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser:
+            fields.extend(["status", "admin_comment"])
+            if obj:
+                fields.extend(["target_type", "name", "parent_category", "comment"])
+        return tuple(dict.fromkeys(fields))
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser or bool(self._get_user_shop(request))
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        shop = self._get_user_shop(request)
+        if not shop:
+            return False
+        return obj is None or obj.shop_id == shop.id
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or bool(self._get_user_shop(request))
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_view_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        old_status = None
+        if change and obj.pk:
+            old_status = type(obj).objects.only("status").get(pk=obj.pk).status
+
+        if not change:
+            obj.requester = request.user
+            if not request.user.is_superuser:
+                obj.shop = self._get_user_shop(request)
+
+        super().save_model(request, obj, form, change)
+
+        if (
+            request.user.is_superuser
+            and obj.status == models.CatalogItemRequest.Status.APPROVED
+            and old_status != obj.status
+        ):
+            try:
+                obj.approve()
+            except ValidationError as exc:
+                raise exc
+
+    @admin.action(description="Утвердить выбранные заявки")
+    def approve_requests(self, request, queryset):
+        approved = 0
+        for obj in queryset:
+            try:
+                obj.approve()
+                approved += 1
+            except ValidationError as exc:
+                self.message_user(
+                    request,
+                    f"Заявка #{obj.pk}: {exc}",
+                    level=messages.ERROR,
+                )
+        if approved:
+            self.message_user(request, f"Утверждено заявок: {approved}")
+
+
 class ProductImageInline(admin.StackedInline):
     model = models.ProductImage
     extra = 0
@@ -302,13 +445,13 @@ class ProductVariantInline(admin.TabularInline):
 @admin.register(models.Product)
 class ProductAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
     list_display = ("name", "category", "brand", "shop")
-    search_fields = ("name", "sku")
+    search_fields = ("name", "variants__sku")
     list_filter = ("category", "brand", "shop")
     prepopulated_fields = {"slug": ("name",)}
     readonly_fields = ("views", "date_time_create", "date_time_update")
     inlines = [ProductVariantInline]
     list_per_page = 20
-    date_hierarchy = "date_time_create"
+    date_hierarchy = None
     autocomplete_fields = (
         "category",
         "brand",
@@ -323,6 +466,22 @@ class ProductAdmin(ShopOwnerAdminMixin, admin.ModelAdmin):
             return self.list_filter
         # Продавец не видит фильтр по магазинам
         return ("category", "brand")
+
+    def changelist_view(self, request, extra_context=None):
+        date_params = {
+            "date_time_create__day",
+            "date_time_create__month",
+            "date_time_create__year",
+        }
+        if date_params.intersection(request.GET):
+            query = request.GET.copy()
+            for param in date_params:
+                query.pop(param, None)
+            redirect_url = request.path
+            if query:
+                redirect_url = f"{redirect_url}?{query.urlencode()}"
+            return HttpResponseRedirect(redirect_url)
+        return super().changelist_view(request, extra_context=extra_context)
 
     def get_fields(self, request, obj=None):
         """Показывает поле 'shop' только для суперпользователей."""

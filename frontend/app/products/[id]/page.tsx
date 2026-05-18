@@ -6,6 +6,11 @@ import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { useAddToCart } from "@/entities/cart/api/useCart"
+import {
+  useAddToFavorites,
+  useGetFavorites,
+  useRemoveFromFavorites,
+} from "@/entities/favorites/api/useFavorites"
 import { useProduct } from "@/entities/products/api/useProduct"
 import { useProfile } from "@/entities/user/api/useProfile"
 import { useAuthWindowStore } from "@/entities/authWindow"
@@ -43,7 +48,9 @@ const getVariantLabel = (
       .filter(Boolean)
       .join(", ") || variant.sku
 
-  return label.length > maxLength ? `${label.slice(0, maxLength - 1)}...` : label
+  return label.length > maxLength
+    ? `${label.slice(0, maxLength - 1)}...`
+    : label
 }
 
 export default function ProductPage() {
@@ -53,9 +60,12 @@ export default function ProductPage() {
   const { data: product, isLoading } = useProduct(id)
   const { data: reviews = [] } = useProductReviews(id)
   const { data: questions = [] } = useProductQuestions(id)
-  const { mutate: createReview, isPending: isCreatingReview } = useCreateReview(id)
-  const { mutate: updateReview, isPending: isUpdatingReview } = useUpdateReview(id)
-  const { mutate: deleteReview, isPending: isDeletingReview } = useDeleteReview(id)
+  const { mutate: createReview, isPending: isCreatingReview } =
+    useCreateReview(id)
+  const { mutate: updateReview, isPending: isUpdatingReview } =
+    useUpdateReview(id)
+  const { mutate: deleteReview, isPending: isDeletingReview } =
+    useDeleteReview(id)
   const { mutate: voteReview, isPending: isVotingReview } = useVoteReview(id)
   const { mutate: createQuestion, isPending: isCreatingQuestion } =
     useCreateProductQuestion(id)
@@ -66,6 +76,11 @@ export default function ProductPage() {
   const { mutate: createReviewComplaint, isPending: isReportingReview } =
     useCreateReviewComplaint()
   const { mutate: addToCart, isPending: isAdding } = useAddToCart()
+  const { data: favorites } = useGetFavorites()
+  const { mutate: addToFavorites, isPending: isAddingFavorite } =
+    useAddToFavorites()
+  const { mutate: removeFromFavorites, isPending: isRemovingFavorite } =
+    useRemoveFromFavorites()
   const queryClient = useQueryClient()
   const { data: profile } = useProfile()
   const toggleAuthWindow = useAuthWindowStore((s) => s.toggle)
@@ -105,6 +120,12 @@ export default function ProductPage() {
     mainVariant
   const allImages = activeVariant?.images || []
   const currentImage = allImages[currentImageIndex]
+  const isFavorite =
+    !!activeVariant &&
+    !!favorites?.favorite_items?.some(
+      (item) => item.product_variant.id === activeVariant.id,
+    )
+  const isFavoritePending = isAddingFavorite || isRemovingFavorite
   const averageRating =
     reviews.length > 0
       ? reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
@@ -161,6 +182,32 @@ export default function ProductPage() {
       {
         onSuccess: () => {
           queryClient.invalidateQueries({ queryKey: ["cart"] })
+        },
+      },
+    )
+  }
+
+  const handleToggleFavorite = () => {
+    if (!activeVariant) return
+    if (!profile) {
+      toggleAuthWindow()
+      return
+    }
+
+    if (isFavorite) {
+      removeFromFavorites(activeVariant.id, {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["favorites"] })
+        },
+      })
+      return
+    }
+
+    addToFavorites(
+      { product_variant_id: activeVariant.id },
+      {
+        onSuccess: () => {
+          queryClient.invalidateQueries({ queryKey: ["favorites"] })
         },
       },
     )
@@ -257,7 +304,12 @@ export default function ProductPage() {
     createProductComplaint(
       {
         product: id,
-        reason: productComplaintReason as "SPAM" | "OFFENSIVE" | "FAKE" | "PROHIBITED" | "OTHER",
+        reason: productComplaintReason as
+          | "SPAM"
+          | "OFFENSIVE"
+          | "FAKE"
+          | "PROHIBITED"
+          | "OTHER",
         text: productComplaintText,
       },
       {
@@ -439,21 +491,26 @@ export default function ProductPage() {
             </div>
 
             {activeVariant && (
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-2xl font-black text-brand-main sm:text-3xl">
-                  {formatPrice(Number(activeVariant.final_price))} ₽
-                </span>
-                {activeVariant.has_discount && (
-                  <span className="text-lg text-slate-400 line-through">
-                    {formatPrice(
-                      Number(
-                        activeVariant.final_price /
-                          (1 - (activeVariant.discount_pct || 0) / 100),
-                      ),
-                    )}{" "}
-                    ₽
+              <div>
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                  <span className="text-2xl font-black text-brand-main sm:text-3xl">
+                    {formatPrice(Number(activeVariant.final_price))} ₽
                   </span>
-                )}
+                  {activeVariant.has_discount && (
+                    <span className="text-lg text-slate-400 line-through">
+                      {formatPrice(
+                        Number(
+                          activeVariant.final_price /
+                            (1 - (activeVariant.discount_pct || 0) / 100),
+                        ),
+                      )}{" "}
+                      ₽
+                    </span>
+                  )}
+                </div>
+                <p className="mt-1 text-sm text-slate-400">
+                  Артикул: {activeVariant.sku}
+                </p>
               </div>
             )}
 
@@ -534,7 +591,10 @@ export default function ProductPage() {
                     setQuantity(
                       Math.max(
                         1,
-                        Math.min(activeVariant?.stock || 1, Number.isNaN(value) ? 1 : value),
+                        Math.min(
+                          activeVariant?.stock || 1,
+                          Number.isNaN(value) ? 1 : value,
+                        ),
                       ),
                     )
                   }}
@@ -543,7 +603,10 @@ export default function ProductPage() {
                 <button
                   onClick={() =>
                     setQuantity(
-                      Math.min(activeVariant ? activeVariant.stock : 1, quantity + 1),
+                      Math.min(
+                        activeVariant ? activeVariant.stock : 1,
+                        quantity + 1,
+                      ),
                     )
                   }
                   className="px-3 py-2 text-lg font-medium hover:bg-slate-50"
@@ -553,10 +616,24 @@ export default function ProductPage() {
               </div>
               <button
                 onClick={handleAddToCart}
-                disabled={isAdding || !activeVariant || activeVariant.stock <= 0}
+                disabled={
+                  isAdding || !activeVariant || activeVariant.stock <= 0
+                }
                 className="w-full rounded-xl bg-brand-main py-3 font-bold text-white shadow-lg shadow-brand-main/20 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 min-[420px]:flex-1"
               >
                 {isAdding ? "Добавление..." : "В корзину"}
+              </button>
+              <button
+                type="button"
+                onClick={handleToggleFavorite}
+                disabled={!activeVariant || isFavoritePending}
+                className={`w-full rounded-xl border py-3 font-bold transition-all active:scale-[0.98] disabled:opacity-50 min-[420px]:w-auto min-[420px]:px-5 ${
+                  isFavorite
+                    ? "border-brand-main bg-brand-main/10 text-brand-main"
+                    : "border-slate-200 bg-white text-slate-700 hover:border-brand-main hover:text-brand-main"
+                }`}
+              >
+                {isFavorite ? "В избранном" : "В избранное"}
               </button>
             </div>
 
@@ -608,7 +685,9 @@ export default function ProductPage() {
                     }
                     className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none focus:border-brand-main"
                   >
-                    <option value="PROHIBITED">Запрещенный товар или контент</option>
+                    <option value="PROHIBITED">
+                      Запрещенный товар или контент
+                    </option>
                     <option value="FAKE">Недостоверная информация</option>
                     <option value="SPAM">Спам</option>
                     <option value="OFFENSIVE">Оскорбительный контент</option>
@@ -648,7 +727,9 @@ export default function ProductPage() {
                 >
                   <p className="text-xs text-slate-400">
                     {question.author_name} ·{" "}
-                    {new Date(question.date_time_create).toLocaleDateString("ru-RU")}
+                    {new Date(question.date_time_create).toLocaleDateString(
+                      "ru-RU",
+                    )}
                   </p>
                   <p className="mt-2 text-sm text-slate-700">{question.text}</p>
                   {question.answer ? (
@@ -753,8 +834,21 @@ export default function ProductPage() {
                             : ""}
                         </p>
                       </div>
-                      <p className="font-bold text-yellow-500">★ {review.rating}</p>
+                      <p className="font-bold text-yellow-500">
+                        ★ {review.rating}
+                      </p>
                     </div>
+                    {review.variant_info && (
+                      <p className="mt-2 text-xs text-slate-400">
+                        Вариация:{" "}
+                        {getVariantLabel({
+                          sku: review.variant_info.sku,
+                          attribute_values:
+                            review.variant_info.attribute_values || [],
+                        })}
+                        {" · "}Артикул: {review.variant_info.sku}
+                      </p>
+                    )}
                     <p className="mt-3 whitespace-pre-line text-sm text-slate-600">
                       {review.description}
                     </p>
@@ -848,7 +942,9 @@ export default function ProductPage() {
                         >
                           <option value="FAKE">Недостоверная информация</option>
                           <option value="SPAM">Спам</option>
-                          <option value="OFFENSIVE">Оскорбительный контент</option>
+                          <option value="OFFENSIVE">
+                            Оскорбительный контент
+                          </option>
                           <option value="OTHER">Другое</option>
                         </select>
                         <textarea
@@ -869,7 +965,9 @@ export default function ProductPage() {
                           disabled={isReportingReview}
                           className="rounded-xl bg-red-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50"
                         >
-                          {isReportingReview ? "Отправка..." : "Отправить жалобу"}
+                          {isReportingReview
+                            ? "Отправка..."
+                            : "Отправить жалобу"}
                         </button>
                       </form>
                     )}

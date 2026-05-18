@@ -187,7 +187,12 @@ class OrderCreateSerializer(serializers.Serializer):
                 variant.id: variant
                 for variant in ProductVariant.objects.with_prices(user=user)
                 .select_for_update(of=("self",))
-                .select_related("product", "product__brand", "product__category")
+                .select_related(
+                    "product",
+                    "product__brand",
+                    "product__category",
+                    "product__shop",
+                )
                 .prefetch_related("product__tags")
                 .filter(id__in=[item.product_variant_id for item in cart_items])
             }
@@ -195,6 +200,12 @@ class OrderCreateSerializer(serializers.Serializer):
             for item in cart_items:
                 variant = locked_variants[item.product_variant_id]
                 item.product_variant = variant
+                if variant.product.shop and variant.product.shop.owner_id == user.id:
+                    raise serializers.ValidationError(
+                        {
+                            "cart": f"Нельзя оформить заказ на свой товар '{variant.product.name}'."
+                        }
+                    )
                 if item.quantity > variant.stock:
                     raise serializers.ValidationError(
                         {

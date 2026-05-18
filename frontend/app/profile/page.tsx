@@ -12,6 +12,7 @@ import { useCancelOrder } from "@/entities/orders/api/useCancelOrder"
 import { useQueryClient } from "@tanstack/react-query"
 import Link from "next/link"
 import { Breadcrumbs } from "@/widgets/Breadcrumbs"
+import { PhoneInput } from "@/shared/ui/PhoneInput"
 
 type ApiError = {
   response?: { data?: { detail?: string; phone_number?: string } }
@@ -163,6 +164,27 @@ export default function ProfilePage() {
           "Ошибка при отмене заказа"
         alert(message)
       },
+    })
+  }
+
+  const handleRequestShopDelete = () => {
+    if (
+      !window.confirm(
+        "Вы уверены, что хотите отправить заявку на удаление магазина?",
+      )
+    ) {
+      return
+    }
+
+    requestShopDelete(undefined, {
+      onSuccess: () =>
+        setShopDeleteMessage(
+          "Заявка на удаление магазина отправлена на модерацию.",
+        ),
+      onError: () =>
+        setShopDeleteMessage(
+          "Не удалось отправить заявку на удаление магазина.",
+        ),
     })
   }
 
@@ -324,22 +346,19 @@ export default function ProfilePage() {
                   Введите новый номер телефона
                 </p>
                 <div className="flex flex-col gap-2 min-[520px]:flex-row">
-                  <input
-                    type="tel"
-                    value={newPhone}
-                    onChange={(e) => {
-                      let val = e.target.value.replace(/\D/g, "")
-                      if (val.startsWith("7")) val = "+" + val
-                      else if (val.startsWith("8")) val = "+7" + val.slice(1)
-                      else if (val && !val.startsWith("+")) val = "+7" + val
-                      setNewPhone(val)
-                    }}
-                    placeholder="+7..."
-                    className="w-full rounded-xl border border-slate-200 px-4 py-2 outline-none focus:border-brand-main min-[520px]:w-48"
-                  />
+                  <div className="w-full min-[520px]:w-56">
+                    <PhoneInput
+                      value={newPhone}
+                      onChange={setNewPhone}
+                      error={phoneError}
+                      hideLabel
+                    />
+                  </div>
                   <button
                     onClick={handleSendNewCode}
-                    disabled={isPhoneChanging}
+                    disabled={
+                      isPhoneChanging || !/^9\d{9}$/.test(newPhone)
+                    }
                     className="w-full rounded-xl bg-brand-main px-4 py-2 text-sm font-medium text-white hover:brightness-110 disabled:opacity-50 min-[520px]:w-auto"
                   >
                     Отправить код
@@ -405,18 +424,7 @@ export default function ProfilePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() =>
-                    requestShopDelete(undefined, {
-                      onSuccess: () =>
-                        setShopDeleteMessage(
-                          "Заявка на удаление магазина отправлена на модерацию.",
-                        ),
-                      onError: () =>
-                        setShopDeleteMessage(
-                          "Не удалось отправить заявку на удаление магазина.",
-                        ),
-                    })
-                  }
+                  onClick={handleRequestShopDelete}
                   disabled={isRequestingShopDelete}
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-all hover:bg-red-50 disabled:opacity-50 sm:w-auto"
                 >

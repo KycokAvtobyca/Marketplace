@@ -98,6 +98,43 @@ class PromoCodeAdmin(admin.ModelAdmin):
             return True
         return bool(self._get_user_shop(request))
 
+    def _owns_promocode(self, request, obj):
+        shop = self._get_user_shop(request)
+        if not shop or not obj:
+            return False
+
+        if obj.product_id and getattr(obj.product, "shop_id", None) == shop.id:
+            return True
+
+        if (
+            obj.product_variant_id
+            and getattr(obj.product_variant.product, "shop_id", None) == shop.id
+        ):
+            return True
+
+        return False
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return bool(self._get_user_shop(request))
+        return self._owns_promocode(request, obj)
+
+    def has_change_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return bool(self._get_user_shop(request))
+        return self._owns_promocode(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        if obj is None:
+            return bool(self._get_user_shop(request))
+        return self._owns_promocode(request, obj)
+
     def get_readonly_fields(self, request, obj=None):
         fields = list(super().get_readonly_fields(request, obj))
         if not request.user.is_superuser:

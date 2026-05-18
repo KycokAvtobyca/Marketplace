@@ -39,7 +39,11 @@ class ReviewViewSet(viewsets.ModelViewSet):
     def get_queryset(self):
         qs = (
             Review.objects.select_related("user", "product_variant__product")
-            .prefetch_related("review_images", "votes")
+            .prefetch_related(
+                "review_images",
+                "votes",
+                "product_variant__attribute_values__attribute",
+            )
             .order_by("-date_time_create", "-id")
         )
 

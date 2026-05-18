@@ -14,6 +14,10 @@ export interface Review {
   current_user_vote: "USEFUL" | "UNUSEFUL" | null
   author_name: string
   user_id: number | null
+  variant_info: {
+    sku: string
+    attribute_values: Array<{ id: number; name: string; attribute?: string }>
+  } | null
   date_time_create: string
   date_time_update: string
   images: Array<{ id: number; image: string }>

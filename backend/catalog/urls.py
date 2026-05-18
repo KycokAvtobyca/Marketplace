@@ -15,6 +15,11 @@ router.register("product-tags", v.ProductTagViewSet)
 router.register("attributes", v.AttributesViewSet)
 router.register("attribute-values", v.AttributeValuesViewSet)
 router.register("product-types", v.ProductTypeViewSet)
+router.register(
+    "catalog-item-requests",
+    v.CatalogItemRequestViewSet,
+    basename="catalog-item-request",
+)
 router.register("sku", v.ProductVariantViewSet, basename="sku")
 router.register("filters", v.FiltersViewSet, basename="catalog")
 

@@ -156,6 +156,15 @@ class OrderAdmin(admin.ModelAdmin):
             return ("status",)
         return ()
 
+    def formfield_for_choice_field(self, db_field, request, **kwargs):
+        if db_field.name == "status" and not request.user.is_superuser:
+            kwargs["choices"] = [
+                choice
+                for choice in db_field.choices
+                if choice[0] != models.Order.Status.PAID
+            ]
+        return super().formfield_for_choice_field(db_field, request, **kwargs)
+
     def save_model(self, request, obj, form, change):
         if (
             change
@@ -167,6 +176,10 @@ class OrderAdmin(admin.ModelAdmin):
             if old_status in self.CLOSED_STATUSES and obj.status != old_status:
                 raise ValidationError(
                     "Закрытый заказ нельзя снова сделать активным для магазина."
+                )
+            if obj.status == models.Order.Status.PAID:
+                raise ValidationError(
+                    "Статус «Оплачен после получения» может установить только администратор."
                 )
 
         super().save_model(request, obj, form, change)

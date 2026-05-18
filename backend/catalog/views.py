@@ -8,11 +8,12 @@ from django.db.models import (
     Min,
     OuterRef,
     Prefetch,
+    Exists,
     Q,
     Subquery,
     Sum,
 )
-from rest_framework import views, viewsets
+from rest_framework import permissions, serializers, views, viewsets
 from rest_framework.request import Request
 from rest_framework.response import Response
 from users import models as mu
@@ -34,6 +35,14 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
     pagination_class = ProductCatalogPagination
 
     @staticmethod
+    def query_values(query_params, *keys):
+        values = []
+        for key in keys:
+            values.extend(query_params.getlist(key))
+            values.extend(query_params.getlist(f"{key}[]"))
+        return [value for value in values if value and value != "/"]
+
+    @staticmethod
     def category_ids_for_slugs(slugs):
         clean_slugs = [slug for slug in slugs if slug and slug != "/"]
         if not clean_slugs:
@@ -49,6 +58,48 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             )
         return list(ids)
 
+    @staticmethod
+    def attribute_value_groups(query_params):
+        explicit_keys = {"attributes", "attribute_values", "values"}
+        attribute_slugs = set(
+            m.Attribute.objects.filter(is_active=True).values_list("slug", flat=True)
+        )
+        value_ids = set()
+
+        for param_key in query_params:
+            clean_key = param_key.replace("[]", "")
+            is_attribute_key = (
+                clean_key in explicit_keys
+                or clean_key.startswith("value_")
+                or clean_key in attribute_slugs
+            )
+            if not is_attribute_key:
+                continue
+
+            for raw_value in query_params.getlist(param_key):
+                try:
+                    value_ids.add(int(raw_value))
+                except (TypeError, ValueError):
+                    continue
+
+        groups = {}
+        rows = m.AttributeValue.objects.filter(pk__in=value_ids).values(
+            "id",
+            "attribute_id",
+        )
+        for row in rows:
+            groups.setdefault(row["attribute_id"], []).append(row["id"])
+
+        return groups
+
+    @staticmethod
+    def apply_attribute_groups_to_variants(queryset, attribute_groups, prefix=""):
+        for value_ids in attribute_groups.values():
+            queryset = queryset.filter(
+                **{f"{prefix}attribute_values__id__in": value_ids}
+            )
+        return queryset
+
     def get_queryset(self):
         user = self.request.user
         visibility_filter = Q(shop__is_active=True)
@@ -56,81 +107,64 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
             visibility_filter |= Q(shop__owner=user)
         queryset = m.Product.objects.filter(visibility_filter)
 
-        category_values = []
-        for key in ("categories", "categories[]", "category"):
-            category_values.extend(self.request.query_params.getlist(key))
+        query_params = self.request.query_params
+        category_values = self.query_values(query_params, "categories", "category")
 
         category_ids = self.category_ids_for_slugs(category_values)
         if category_ids:
             queryset = queryset.filter(category_id__in=category_ids)
 
-        # --- ДИНАМИЧЕСКАЯ ФИЛЬТРАЦИЯ ---
-        filter_map = {
-            # Категории (odezhda, obuv и т.д. на фронте приходят как отдельные ключи)
-            "odezhda": "category__slug__in",
-            "obuv": "category__slug__in",
-            # Бренды и Магазины
+        simple_filter_map = {
             "brands": "brand__slug__in",
             "shops": "shop__slug__in",
-            # Тип продукта (в модели поле product_type)
             "product_types": "product_type__slug__in",
-            # Атрибуты (Материал, Размер и т.д.)
-            "material": "variants__attribute_values__id__in",
-            "razmer": "variants__attribute_values__id__in",
+            "types": "product_type__slug__in",
         }
+        for param_key, lookup in simple_filter_map.items():
+            values = self.query_values(query_params, param_key)
+            if values:
+                queryset = queryset.filter(**{lookup: values})
 
-        # Проходим по всем параметрам в URL
-        for param_key in self.request.query_params:
-            clean_key = param_key.replace("[]", "")
-
-            if clean_key in ("categories", "category"):
-                continue
-
-            if clean_key in filter_map:
-                values = self.request.query_params.getlist(param_key)
-                if values:
-                    lookup = filter_map[clean_key]
-                    queryset = queryset.filter(**{lookup: values})
-
-        min_price = self.request.query_params.get(
-            "price_min"
-        ) or self.request.query_params.get("min_price")
-        max_price = self.request.query_params.get(
-            "price_max"
-        ) or self.request.query_params.get("max_price")
-
+        min_price = query_params.get("price_min") or query_params.get("min_price")
+        max_price = query_params.get("price_max") or query_params.get("max_price")
+        min_price_decimal = None
+        max_price_decimal = None
         if min_price:
             try:
                 min_price_decimal = Decimal(min_price)
-                queryset = queryset.filter(
-                    variants__in=m.ProductVariant.objects.with_prices(
-                        user=user
-                    ).filter(
-                        is_active=True,
-                        stock__gt=0,
-                        discounted_price__gte=min_price_decimal,
-                    )
-                )
             except (InvalidOperation, ValueError):
                 pass
 
         if max_price:
             try:
                 max_price_decimal = Decimal(max_price)
-                queryset = queryset.filter(
-                    variants__in=m.ProductVariant.objects.with_prices(
-                        user=user
-                    ).filter(
-                        is_active=True,
-                        stock__gt=0,
-                        discounted_price__lte=max_price_decimal,
-                    )
-                )
             except (InvalidOperation, ValueError):
                 pass
 
+        attribute_groups = self.attribute_value_groups(query_params)
+        matching_variants = m.ProductVariant.objects.with_prices(user=user).filter(
+            product=OuterRef("pk"),
+            is_active=True,
+            stock__gt=0,
+        )
+        matching_variants = self.apply_attribute_groups_to_variants(
+            matching_variants,
+            attribute_groups,
+        )
+        if min_price_decimal is not None:
+            matching_variants = matching_variants.filter(
+                discounted_price__gte=min_price_decimal
+            )
+        if max_price_decimal is not None:
+            matching_variants = matching_variants.filter(
+                discounted_price__lte=max_price_decimal
+            )
+
+        if attribute_groups or min_price_decimal is not None or max_price_decimal is not None:
+            queryset = queryset.filter(Exists(matching_variants))
+
         # --- ПОИСК ПО НАЗВАНИЮ И ОПИСАНИЮ ---
-        search_query = self.request.query_params.get("search", "").strip()
+        search_query = query_params.get("search", "").strip()
         if search_query:
             queryset = queryset.filter(
                 Q(name__icontains=search_query)
@@ -143,27 +177,40 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
         variants_with_prices = m.ProductVariant.objects.filter(
             product=OuterRef("pk"), is_active=True, stock__gt=0
         ).with_prices(user=user)
+        variants_with_prices = self.apply_attribute_groups_to_variants(
+            variants_with_prices,
+            attribute_groups,
+        )
 
         main_image_sq = m.ProductImage.objects.filter(
             variant__product=OuterRef("pk"),
             variant__is_active=True,
             variant__stock__gt=0,
+        )
+        main_image_sq = self.apply_attribute_groups_to_variants(
+            main_image_sq,
+            attribute_groups,
+            prefix="variant__",
         ).order_by("-variant__is_main", "-variant__stock", "-is_main", "variant_id", "pk").values("image")
 
         sku_sq = (
             m.ProductVariant.objects.filter(
                 product=OuterRef("pk"), is_active=True, stock__gt=0
             )
-            .order_by("-is_main", "-stock", "pk")
-            .values("sku")[:1]
         )
+        sku_sq = self.apply_attribute_groups_to_variants(
+            sku_sq,
+            attribute_groups,
+        ).order_by("-is_main", "-stock", "pk").values("sku")[:1]
         variant_id_sq = (
             m.ProductVariant.objects.filter(
                 product=OuterRef("pk"), is_active=True, stock__gt=0
             )
-            .order_by("-is_main", "-stock", "pk")
-            .values("id")[:1]
         )
+        variant_id_sq = self.apply_attribute_groups_to_variants(
+            variant_id_sq,
+            attribute_groups,
+        ).order_by("-is_main", "-stock", "pk").values("id")[:1]
 
         from django.db.models import Case, IntegerField, When
 
@@ -346,6 +393,42 @@ class ProductTypeViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = m.ProductType.objects.all()
     serializer_class = s.ProductTypeSerializer
     pagination_class = FilterValuesPagination
+
+
+class CatalogItemRequestViewSet(viewsets.ModelViewSet):
+    serializer_class = s.CatalogItemRequestSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    http_method_names = ["get", "post", "head", "options"]
+    pagination_class = DefaultCursorPagination
+
+    def get_queryset(self):
+        qs = m.CatalogItemRequest.objects.select_related(
+            "requester",
+            "shop",
+            "parent_category",
+            "created_product_type",
+            "created_category",
+            "created_product_tag",
+        ).order_by("-date_time_create", "-id")
+
+        user = self.request.user
+        if user.is_superuser:
+            return qs
+
+        shop = mu.Shop.objects.filter(owner=user).first()
+        if not shop:
+            return qs.none()
+
+        return qs.filter(Q(requester=user) | Q(shop=shop)).distinct()
+
+    def perform_create(self, serializer):
+        shop = mu.Shop.objects.filter(owner=self.request.user).first()
+        if not shop:
+            raise serializers.ValidationError(
+                {"shop": "Заявки на справочники может отправлять только магазин."}
+            )
+
+        serializer.save(requester=self.request.user, shop=shop)
 
 
 class ProductVariantViewSet(viewsets.ReadOnlyModelViewSet):

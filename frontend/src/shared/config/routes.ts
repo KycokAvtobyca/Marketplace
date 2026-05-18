@@ -72,6 +72,10 @@ const CATALOG_APP_ROUTES = {
     ROOT: "product-types/",
     RETRIEVE: (slug: string) => `product-types/${slug}/`,
   },
+  CATALOG_ITEM_REQUESTS: {
+    ROOT: "catalog-item-requests/",
+    RETRIEVE: (id: number) => `catalog-item-requests/${id}/`,
+  },
   PRODUCTS: {
     ROOT: "products/",
     RETRIEVE: (id: number) => `products/${id}/`,

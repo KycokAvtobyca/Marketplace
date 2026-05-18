@@ -298,11 +298,34 @@ export const CartPage = () => {
                   </div>
 
                   <div className="text-left min-[520px]:text-right">
-                    <p className="text-lg font-bold text-slate-900">
-                      {formatPrice(item.total_price)} ₽
-                    </p>
+                    {item.has_promocode_discount ? (
+                      <div>
+                        <p className="text-sm text-slate-400 line-through">
+                          {formatPrice(item.total_price)} ₽
+                        </p>
+                        <p className="text-lg font-bold text-brand-main">
+                          {formatPrice(item.promocode_total_price)} ₽
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-lg font-bold text-slate-900">
+                        {formatPrice(item.total_price)} ₽
+                      </p>
+                    )}
                     <p className="text-[10px] text-slate-400">
-                      {formatPrice(item.product_variant.final_price)} ₽ / шт.
+                      {item.has_promocode_discount ? (
+                        <>
+                          <span className="line-through">
+                            {formatPrice(item.product_variant.final_price)} ₽
+                          </span>{" "}
+                          <span className="text-brand-main">
+                            {formatPrice(item.promocode_final_price)} ₽
+                          </span>
+                        </>
+                      ) : (
+                        <>{formatPrice(item.product_variant.final_price)} ₽</>
+                      )}{" "}
+                      / шт.
                     </p>
                   </div>
                 </div>

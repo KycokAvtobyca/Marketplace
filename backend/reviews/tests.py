@@ -33,10 +33,10 @@ class ReviewApiTests(TestCase):
             is_active=True,
         )
 
-    def _completed_order(self):
+    def _completed_order(self, status=Order.Status.COMPLETED):
         order = Order.objects.create(
             user=self.user,
-            status=Order.Status.COMPLETED,
+            status=status,
             name="Иван",
             phone_number="+79642297622",
             delivery_type=Order.DeliveryType.PICKUP,
@@ -89,6 +89,23 @@ class ReviewApiTests(TestCase):
             format="json",
         )
         self.assertEqual(duplicate.status_code, 400)
+
+    def test_user_can_review_paid_after_receipt_purchase(self):
+        self._completed_order(status=Order.Status.PAID)
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        response = client.post(
+            "/api/v1/reviews/",
+            {
+                "product_variant": self.variant.pk,
+                "rating": 5,
+                "description": "Товар получен и оплачен после получения, отзыв разрешен",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
 
     def test_public_list_contains_only_approved_reviews(self):
         self._completed_order()

@@ -1,7 +1,14 @@
+from catalog.models import AttributeValue
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
-from .models import ProductComplaint, ProductQuestion, Review, ReviewComplaint, ReviewImage
+from .models import (
+    ProductComplaint,
+    ProductQuestion,
+    Review,
+    ReviewComplaint,
+    ReviewImage,
+)
 
 
 class ReviewImageSerializer(serializers.ModelSerializer):
@@ -18,11 +25,37 @@ class ReviewImageSerializer(serializers.ModelSerializer):
         return obj.image.url
 
 
+class AttributeValueSimpleSerializer(serializers.ModelSerializer):
+    name = serializers.CharField(source="value")
+    attribute = serializers.CharField(source="attribute.name", read_only=True)
+
+    class Meta:
+        model = AttributeValue
+        fields = ["id", "name", "attribute"]
+
+
+class ReviewVariantInfoSerializer(serializers.Serializer):
+    """Информация о варианте товара для отзыва"""
+
+    sku = serializers.CharField()
+    attribute_values = serializers.SerializerMethodField()
+
+    def get_attribute_values(self, obj):
+        if hasattr(obj, "attribute_values"):
+            return AttributeValueSimpleSerializer(
+                obj.attribute_values.all(), many=True
+            ).data
+        return []
+
+
 class ReviewSerializer(serializers.ModelSerializer):
-    images = ReviewImageSerializer(source="review_images", many=True, read_only=True)
+    images = ReviewImageSerializer(
+        source="review_images", many=True, read_only=True
+    )
     author_name = serializers.SerializerMethodField()
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     current_user_vote = serializers.SerializerMethodField()
+    variant_info = serializers.SerializerMethodField()
 
     class Meta:
         model = Review
@@ -38,6 +71,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "author_name",
             "user_id",
             "current_user_vote",
+            "variant_info",
             "date_time_create",
             "date_time_update",
             "images",
@@ -51,6 +85,7 @@ class ReviewSerializer(serializers.ModelSerializer):
             "author_name",
             "user_id",
             "current_user_vote",
+            "variant_info",
             "date_time_create",
             "date_time_update",
             "images",
@@ -68,11 +103,19 @@ class ReviewSerializer(serializers.ModelSerializer):
         existing_vote = obj.votes.filter(user=request.user).first()
         return existing_vote.value if existing_vote else None
 
+    def get_variant_info(self, obj):
+        if obj.product_variant:
+            serializer = ReviewVariantInfoSerializer(obj.product_variant)
+            return serializer.data
+        return None
+
     def validate(self, attrs):
         if self.instance and "product_variant" in attrs:
             if attrs["product_variant"].pk != self.instance.product_variant_id:
                 raise serializers.ValidationError(
-                    {"product_variant": "Нельзя перенести отзыв на другой товар."}
+                    {
+                        "product_variant": "Нельзя перенести отзыв на другой товар."
+                    }
                 )
         return attrs
 
@@ -83,17 +126,22 @@ class ReviewSerializer(serializers.ModelSerializer):
             review.full_clean()
         except DjangoValidationError as exc:
             raise serializers.ValidationError(
-                exc.message_dict if hasattr(exc, "message_dict") else exc.messages
+                exc.message_dict
+                if hasattr(exc, "message_dict")
+                else exc.messages
             ) from exc
         review.save()
         return review
 
 
 class ProductQuestionSerializer(serializers.ModelSerializer):
+    answer = serializers.SerializerMethodField()
     author_name = serializers.SerializerMethodField()
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     answered_by_name = serializers.SerializerMethodField()
+    moderation_status = serializers.SerializerMethodField()
+    answer_moderation_status = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductQuestion
@@ -108,6 +156,8 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
             "answered_by_name",
             "answered_at",
             "is_public",
+            "moderation_status",
+            "answer_moderation_status",
             "date_time_create",
             "date_time_update",
         ]
@@ -120,6 +170,8 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
             "answered_by_name",
             "answered_at",
             "is_public",
+            "moderation_status",
+            "answer_moderation_status",
             "date_time_create",
             "date_time_update",
         ]
@@ -134,6 +186,59 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
             return ""
         shop = obj.product.shop
         return shop.name if shop else obj.answered_by.name or "Продавец"
+
+    def get_answer(self, obj):
+        if not obj.answer:
+            return ""
+
+        request = self.context.get("request")
+
+        moderation_manager = getattr(obj, "answer_moderation_requests", None)
+        if moderation_manager is None:
+            return obj.answer
+
+        answer_moderation = moderation_manager.first()
+        if not answer_moderation:
+            return obj.answer
+
+        if getattr(answer_moderation, "status", None) == "APPROVED":
+            return obj.answer
+
+        if (
+            request
+            and request.user
+            and request.user.is_authenticated
+            and (
+                request.user.is_staff
+                or request.user.is_superuser
+                or request.user == obj.user
+                or (obj.product.shop and obj.product.shop.owner_id == request.user.id)
+            )
+        ):
+            return obj.answer
+
+        return ""
+
+    def get_moderation_status(self, obj):
+        moderation = getattr(obj, "moderation_request", None)
+        if not moderation:
+            return None
+        return {
+            "status": moderation.status,
+            "label": moderation.get_status_display(),
+            "comment": moderation.admin_comment,
+        }
+
+    def get_answer_moderation_status(self, obj):
+        moderation_manager = getattr(obj, "answer_moderation_requests", None)
+        moderation = moderation_manager.first() if moderation_manager else None
+        if not moderation:
+            return None
+        return {
+            "status": moderation.status,
+            "label": moderation.get_status_display(),
+            "comment": moderation.admin_comment,
+        }
 
     def create(self, validated_data):
         request = self.context["request"]
@@ -152,7 +257,12 @@ class ReviewComplaintSerializer(serializers.ModelSerializer):
             "date_time_create",
             "date_time_update",
         ]
-        read_only_fields = ["id", "status", "date_time_create", "date_time_update"]
+        read_only_fields = [
+            "id",
+            "status",
+            "date_time_create",
+            "date_time_update",
+        ]
 
     def validate(self, attrs):
         request = self.context["request"]
@@ -185,7 +295,12 @@ class ProductComplaintSerializer(serializers.ModelSerializer):
             "date_time_create",
             "date_time_update",
         ]
-        read_only_fields = ["id", "status", "date_time_create", "date_time_update"]
+        read_only_fields = [
+            "id",
+            "status",
+            "date_time_create",
+            "date_time_update",
+        ]
 
     def validate(self, attrs):
         request = self.context["request"]

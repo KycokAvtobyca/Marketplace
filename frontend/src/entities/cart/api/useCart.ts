@@ -26,6 +26,10 @@ interface CartResponse {
     }
     quantity: number
     total_price: number
+    has_promocode_discount: boolean
+    promocode_discount: string
+    promocode_final_price: string
+    promocode_total_price: string
   }>
   total_items_price: number
   total_cost: number

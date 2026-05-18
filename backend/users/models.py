@@ -124,10 +124,17 @@ class CustomUser(
 
         from orders.models import Order, OrderItem
 
+        allowed_statuses = [
+            Order.Status.DELIVERING,
+            Order.Status.READY_FOR_PICKUP,
+            Order.Status.COMPLETED,
+            Order.Status.PAID,
+        ]
+
         return OrderItem.objects.filter(
             order__user_id=self.id,
             product_variant_id=variant.pk,
-            order__status=Order.Status.COMPLETED,
+            order__status__in=allowed_statuses,
         ).exists()
 
     def save(self, *args, **kwargs):
