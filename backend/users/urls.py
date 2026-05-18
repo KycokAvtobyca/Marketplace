@@ -7,6 +7,7 @@ from rest_framework_simplejwt.views import (
 from .views import (
     AdminAutoLoginView,
     CreateShopView,
+    DeleteShopRequestView,
     HttpOnlyTokenRefreshView,
     HybridTokenObtainView,
     LogoutView,
@@ -36,6 +37,7 @@ urlpatterns = [
     path("profile/", ProfileView.as_view(), name="profile"),
     path("profile/phone-change/", PhoneChangeView.as_view(), name="phone_change"),
     path("shop/create/", CreateShopView.as_view(), name="shop_create"),
+    path("shop/delete-request/", DeleteShopRequestView.as_view(), name="shop_delete_request"),
     path("shop/my/", MyShopView.as_view(), name="my_shop"),
     path("shop/report-options/", ShopReportOptionsView.as_view(), name="shop_report_options"),
     path("admin-login/", AdminAutoLoginView.as_view(), name="admin_login"),

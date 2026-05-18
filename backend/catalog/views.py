@@ -51,7 +51,10 @@ class ProductCatalogViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        queryset = m.Product.objects.filter(shop__is_active=True)
+        visibility_filter = Q(shop__is_active=True)
+        if user.is_authenticated:
+            visibility_filter |= Q(shop__owner=user)
+        queryset = m.Product.objects.filter(visibility_filter)
 
         category_values = []
         for key in ("categories", "categories[]", "category"):
@@ -245,7 +248,7 @@ class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
                     "variants",
                     queryset=m.ProductVariant.objects.filter(
                         is_active=True
-                    ).prefetch_related("attribute_values"),
+                    ).prefetch_related("attribute_values__attribute"),
                 )
             )
 
@@ -257,8 +260,11 @@ class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
                 "category",  # доступ к category_id без запроса
             )
             .prefetch_related(*prefetches)
-            .filter(shop__is_active=True)
         )
+        visibility_filter = Q(shop__is_active=True)
+        if self.request.user.is_authenticated:
+            visibility_filter |= Q(shop__owner=self.request.user)
+        qs = qs.filter(visibility_filter)
 
         brand_slug = self.kwargs.get("brand_slug")
 
@@ -351,7 +357,7 @@ class ProductVariantViewSet(viewsets.ReadOnlyModelViewSet):
 
         return (
             m.ProductVariant.objects.with_prices(user=user)
-            .prefetch_related("attribute_values")
+            .prefetch_related("attribute_values__attribute")
             .filter(is_active=True)
         )
 

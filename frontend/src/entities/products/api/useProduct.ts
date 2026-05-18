@@ -17,7 +17,12 @@ export interface ProductVariant {
   stock: number
   is_active: boolean
   is_main: boolean
-  attribute_values: Array<{ id: number; name: string }>
+  attribute_values: Array<{
+    id: number
+    name: string
+    attribute?: string
+    attribute_id?: number
+  }>
   images: ProductImage[]
 }
 

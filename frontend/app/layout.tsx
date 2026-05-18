@@ -11,6 +11,7 @@ import { api } from "@/shared/api"
 import { Footer } from "@/widgets/Footer"
 import { CompactHeader } from "@/widgets/CompactHeader"
 import { Header } from "@/widgets/Header"
+import { HeaderVisibility } from "@/widgets/HeaderVisibility"
 import { AuthWindow } from "@/widgets/AuthWindow/ui/AuthWindow"
 
 export const revalidate = 7200
@@ -48,14 +49,15 @@ export default async function RootLayout({
         <body className="flex min-h-screen flex-col items-center overflow-x-hidden bg-default text-brand-main">
           <HydrationBoundary state={dehydrate(queryClient)}>
             <div className="relative flex min-h-screen w-full max-w-5xl flex-col px-2 py-3 sm:px-3">
-              <div className="sticky top-0 z-[35] hidden sm:block">
-                <Header />
-              </div>
-              <div className="sticky top-0 z-[35] block sm:hidden">
-                <CompactHeader />
-              </div>
-              <div className="h-4 sm:h-6" />
-              <main className="grow space-y-5 pb-10">
+              <HeaderVisibility>
+                <div className="hidden sm:block">
+                  <Header />
+                </div>
+                <div className="block sm:hidden">
+                  <CompactHeader />
+                </div>
+              </HeaderVisibility>
+              <main className="grow space-y-5 pb-10 pt-[var(--app-header-offset,0px)] transition-[padding] duration-200">
                 {children}
               </main>
               <AuthWindow />

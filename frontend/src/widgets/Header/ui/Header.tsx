@@ -9,7 +9,7 @@ export const Header = () => {
   return (
     <header
       className="
-      sticky top-0 z-[35] flex min-h-12 w-full max-w-5xl flex-row items-center justify-between
+      flex min-h-12 w-full max-w-5xl flex-row items-center justify-between
       gap-3 rounded-xl border border-brand-main/10 bg-brand-main/5 p-2 py-1.5 shadow-sm backdrop-blur-md"
     >
       <div className="flex min-w-0 items-center gap-3">

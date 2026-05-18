@@ -1,9 +1,23 @@
+from django import forms
 from django.contrib import admin
 from django.core.exceptions import PermissionDenied
 
 from catalog import models as catalog_models
 
 from . import models
+
+
+class PromoCodeAdminForm(forms.ModelForm):
+    class Meta:
+        model = models.PromoCode
+        fields = "__all__"
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get("product_variant"):
+            cleaned_data["product"] = None
+            self.instance.product = None
+        return cleaned_data
 
 
 @admin.register(models.Discount)
@@ -23,6 +37,7 @@ class DiscountAdmin(admin.ModelAdmin):
 
 @admin.register(models.PromoCode)
 class PromoCodeAdmin(admin.ModelAdmin):
+    form = PromoCodeAdminForm
     list_display = (
         "code",
         "is_active",

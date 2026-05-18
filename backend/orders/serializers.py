@@ -6,7 +6,7 @@ from django.db import transaction
 from django.db.models import F
 from rest_framework import serializers
 
-from .models import Order, OrderItem
+from .models import Order, OrderItem, PickupPoint, get_default_valid_to
 
 
 class OrderItemSerializer(serializers.ModelSerializer):
@@ -50,9 +50,7 @@ class OrderSerializer(serializers.ModelSerializer):
     delivery_type_display = serializers.CharField(
         source="get_delivery_type_display", read_only=True
     )
-    branch_display = serializers.CharField(
-        source="get_branch_display", read_only=True
-    )
+    branch_display = serializers.SerializerMethodField()
 
     class Meta:
         model = Order
@@ -84,11 +82,27 @@ class OrderSerializer(serializers.ModelSerializer):
             "date_time_create",
         ]
 
+    def get_branch_display(self, obj):
+        if not obj.branch:
+            return ""
+        point = PickupPoint.objects.filter(code=obj.branch).first()
+        return str(point) if point else obj.branch
+
+
+class PickupPointSerializer(serializers.ModelSerializer):
+    label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = PickupPoint
+        fields = ["code", "name", "address", "label"]
+
+    def get_label(self, obj):
+        return str(obj)
+
 
 class OrderCreateSerializer(serializers.Serializer):
     delivery_type = serializers.ChoiceField(choices=Order.DeliveryType.choices)
-    branch = serializers.ChoiceField(
-        choices=Order.PickUpBranches.choices,
+    branch = serializers.CharField(
         required=False,
         allow_blank=True,
         allow_null=True,
@@ -112,6 +126,12 @@ class OrderCreateSerializer(serializers.Serializer):
             raise serializers.ValidationError(
                 {"branch": "Для самовывоза необходимо указать пункт выдачи."}
             )
+
+        if delivery_type == Order.DeliveryType.PICKUP and branch:
+            if not PickupPoint.objects.filter(code=branch, is_active=True).exists():
+                raise serializers.ValidationError(
+                    {"branch": "Выберите доступный пункт выдачи."}
+                )
 
         if delivery_type == Order.DeliveryType.COURIER and not address:
             raise serializers.ValidationError(
@@ -139,6 +159,7 @@ class OrderCreateSerializer(serializers.Serializer):
         if delivery_type == Order.DeliveryType.PICKUP:
             data["address"] = None
             data["address_data"] = None
+            data["date_time_deliver"] = date_time_deliver or get_default_valid_to()
         elif delivery_type == Order.DeliveryType.COURIER:
             data["branch"] = None
             data["address"] = address

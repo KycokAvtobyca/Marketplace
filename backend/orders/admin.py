@@ -4,6 +4,14 @@ from django.core.exceptions import ValidationError
 from . import models
 
 
+@admin.register(models.PickupPoint)
+class PickupPointAdmin(admin.ModelAdmin):
+    list_display = ("name", "code", "address", "is_active")
+    search_fields = ("name", "code", "address")
+    list_filter = ("is_active",)
+    prepopulated_fields = {"code": ("name",)}
+
+
 class OrderItemInline(admin.TabularInline):
     model = models.OrderItem
     extra = 0
@@ -19,6 +27,9 @@ class OrderItemInline(admin.TabularInline):
         "discounted_price_per_item",
     )
     can_delete = False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -80,7 +91,7 @@ class OrderAdmin(admin.ModelAdmin):
 
     inlines = [OrderItemInline]
     list_per_page = 20
-    date_hierarchy = "date_time_create"
+    date_hierarchy = None
 
     def get_queryset(self, request):
         qs = super().get_queryset(request)
@@ -211,7 +222,7 @@ class OrderItemAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None):
-        return False
+        return request.user.is_superuser
 
     def has_change_permission(self, request, obj=None):
         return False

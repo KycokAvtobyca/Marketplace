@@ -17,12 +17,13 @@ from users.serializers import (
     HybridTokenSerializer,
     PhoneChangeSerializer,
     ShopCreateSerializer,
+    ShopModerationRequestSerializer,
     ShopSerializer,
     UserSerializer,
     UserUpdateSerializer,
 )
 
-from .models import CustomUser, Shop, SMSCode
+from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
 from .throttling import (
     # AuthTokenByPhone,
     # AuthTokenIPThrottle,
@@ -313,23 +314,73 @@ class CreateShopView(APIView):
                 {"detail": "У вас уже есть магазин"},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if ShopModerationRequest.objects.filter(
+            user=user,
+            action=ShopModerationRequest.Action.CREATE,
+            status=ShopModerationRequest.Status.NEW,
+        ).exists():
+            return Response(
+                {"detail": "Заявка на создание магазина уже находится на модерации."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         serializer = ShopCreateSerializer(data=request.data)
         if serializer.is_valid():
-            shop = serializer.save(owner=user, is_active=True)
-            user.is_staff = True
-            user.save()
+            request_obj = ShopModerationRequest.objects.create(
+                user=user,
+                action=ShopModerationRequest.Action.CREATE,
+                name=serializer.validated_data["name"],
+                description=serializer.validated_data.get("description", ""),
+                image=serializer.validated_data.get("image"),
+            )
 
             return Response(
                 {
-                    "message": "Магазин успешно создан",
-                    "shop": ShopSerializer(shop).data,
-                    "admin_url": "/admin/",
+                    "message": "Заявка на создание магазина отправлена на модерацию.",
+                    "request": ShopModerationRequestSerializer(request_obj).data,
                 },
                 status=status.HTTP_201_CREATED,
             )
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class DeleteShopRequestView(APIView):
+    authentication_classes = [HttpOnlyJWTAuthentication]
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        shop = Shop.objects.filter(owner=request.user).first()
+        if not shop:
+            return Response(
+                {"detail": "У вас нет магазина."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if ShopModerationRequest.objects.filter(
+            user=request.user,
+            shop=shop,
+            action=ShopModerationRequest.Action.DELETE,
+            status=ShopModerationRequest.Status.NEW,
+        ).exists():
+            return Response(
+                {"detail": "Заявка на удаление магазина уже находится на модерации."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        request_obj = ShopModerationRequest.objects.create(
+            user=request.user,
+            shop=shop,
+            action=ShopModerationRequest.Action.DELETE,
+            name=shop.name,
+            description=shop.description,
+        )
+        return Response(
+            {
+                "message": "Заявка на удаление магазина отправлена на модерацию.",
+                "request": ShopModerationRequestSerializer(request_obj).data,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 
 class LogoutView(APIView):

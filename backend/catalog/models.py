@@ -143,6 +143,78 @@ class AttributeValue(models.Model):
 
 
 # Типа продукта (Толстовки, Футболки, как пример, но не категории)
+class AttributeRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Status(models.TextChoices):
+        NEW = "NEW", "Новая"
+        IN_PROGRESS = "IN_PROGRESS", "В работе"
+        DONE = "DONE", "Выполнена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="attribute_requests",
+        verbose_name="Заявитель",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="attribute_requests",
+        verbose_name="Магазин",
+    )
+    attribute = models.ForeignKey(
+        Attribute,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="value_requests",
+        verbose_name="Существующий атрибут",
+        help_text="Укажите, если нужно добавить только новое значение.",
+    )
+    attribute_name = models.CharField(
+        "Новый атрибут",
+        max_length=99,
+        blank=True,
+        validators=[MinLengthValidator(2)],
+    )
+    value = models.CharField(
+        "Новое значение",
+        max_length=50,
+        blank=True,
+        validators=[MinLengthValidator(1)],
+    )
+    comment = models.TextField("Комментарий", max_length=1000, blank=True)
+    status = models.CharField(
+        "Статус", max_length=20, choices=Status.choices, default=Status.NEW
+    )
+    admin_comment = models.TextField(
+        "Комментарий администратора", max_length=1000, blank=True
+    )
+
+    class Meta:
+        ordering = ["-date_time_create", "-pk"]
+        verbose_name = "Заявка на атрибут"
+        verbose_name_plural = "Заявки на атрибуты"
+
+    def clean(self):
+        super().clean()
+        if not self.attribute and not self.attribute_name:
+            raise ValidationError(
+                {"attribute_name": "Укажите новый атрибут или выберите существующий."}
+            )
+        if not self.attribute_name and not self.value:
+            raise ValidationError(
+                {"value": "Для существующего атрибута укажите новое значение."}
+            )
+
+    def __str__(self):
+        target = self.attribute.name if self.attribute_id else self.attribute_name
+        return f"{target}: {self.value or 'атрибут'}"
+
+
 class ProductType(SlugifiedNameMixin):
     class Meta:
         ordering = ["name", "pk"]

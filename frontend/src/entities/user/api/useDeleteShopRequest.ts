@@ -2,17 +2,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { api } from "@/shared/api"
 import { ROUTES } from "@/shared/config"
 
-export interface CreateShopPayload {
-  name: string
-  description?: string
-}
-
-export const useCreateShop = () => {
+export const useDeleteShopRequest = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (payload: CreateShopPayload) => {
-      const { data } = await api.post(ROUTES.SHOP_CREATE, payload)
+    mutationFn: async () => {
+      const { data } = await api.post(ROUTES.SHOP_DELETE_REQUEST)
       return data
     },
     onSuccess: () => {

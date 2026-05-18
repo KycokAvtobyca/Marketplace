@@ -1,9 +1,11 @@
 from common.phone import PhoneValidationError, normalize_ru_mobile_phone
+from django.core.exceptions import ValidationError as DjangoValidationError
+from django.core.validators import validate_email
 from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CustomUser, Shop, SMSCode
+from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
 
 
 class HybridTokenSerializer(TokenObtainPairSerializer):
@@ -106,6 +108,24 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "address_data",
         )
 
+    def validate_email(self, value):
+        if not value:
+            return value
+        value = value.strip().lower()
+        try:
+            validate_email(value)
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(
+                "Введите корректный email, например name@example.com."
+            ) from exc
+
+        domain = value.rsplit("@", 1)[-1]
+        if "." not in domain or domain.startswith(".") or domain.endswith("."):
+            raise serializers.ValidationError(
+                "Введите корректный email с доменом, например name@example.com."
+            )
+        return value
+
 
 class PhoneChangeSerializer(serializers.Serializer):
     action = serializers.ChoiceField(
@@ -130,3 +150,19 @@ class ShopCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = Shop
         fields = ["name", "description", "image"]
+
+
+class ShopModerationRequestSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ShopModerationRequest
+        fields = [
+            "id",
+            "action",
+            "status",
+            "name",
+            "description",
+            "image",
+            "admin_comment",
+            "date_time_create",
+        ]
+        read_only_fields = ["id", "action", "status", "admin_comment", "date_time_create"]

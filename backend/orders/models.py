@@ -27,7 +27,8 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     class Status(models.TextChoices):
         CREATED = "CREATED", "Оформлен"
         ASSEMBLING = "ASSEMBLING", "Собирается"
-        DELIVERING = "DELIVERING", "В пути / готов к выдаче"
+        DELIVERING = "DELIVERING", "В пути"
+        READY_FOR_PICKUP = "READY_FOR_PICKUP", "Готов к выдаче"
         COMPLETED = "COMPLETED", "Получен, ожидает оплаты"
         PAID = "PAID", "Оплачен после получения"
         CANCELED = "CANCELED", "Отменен"
@@ -77,7 +78,6 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
     branch = models.CharField(
         "Пункт выдачи",
         max_length=50,
-        choices=PickUpBranches.choices,
         blank=True,
         null=True,
     )
@@ -193,7 +193,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
                 }
             )
 
-        if self.promocode:
+        if self.promocode and not self.pk:
             self.promocode.can_use(
                 user=self.user, order_total=self.get_base_price_for_promocode()
             )
@@ -214,7 +214,7 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
             config = SiteConfiguration.load()
             self.max_percentage_can_use = config.max_discount_percentage
 
-        if self.promocode:
+        if self.promocode and not self.pk:
             self.promocode.can_use(
                 user=self.user, order_total=self.get_base_price_for_promocode()
             )
@@ -223,6 +223,21 @@ class Order(DateTimeCreateMixin, DateTimeUpdateMixin):
 
     def __str__(self):
         return f"Заказ #{self.pk} ({self.get_status_display()}) - {self.phone_number}"
+
+
+class PickupPoint(DateTimeCreateMixin, DateTimeUpdateMixin):
+    code = models.SlugField("Код", max_length=50, unique=True)
+    name = models.CharField("Название", max_length=120)
+    address = models.CharField("Адрес", max_length=255)
+    is_active = models.BooleanField("Активен", default=True)
+
+    class Meta:
+        ordering = ["name", "pk"]
+        verbose_name = "Пункт выдачи"
+        verbose_name_plural = "Пункты выдачи"
+
+    def __str__(self):
+        return f"{self.name} - {self.address}"
 
 
 class OrderItem(DateTimeCreateMixin):

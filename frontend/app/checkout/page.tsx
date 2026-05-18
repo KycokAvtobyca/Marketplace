@@ -12,10 +12,15 @@ import { useRouter } from "next/navigation"
 import { Breadcrumbs } from "@/widgets/Breadcrumbs"
 import { PhoneInput } from "@/shared/ui/PhoneInput"
 import { isAxiosError } from "axios"
+import { useQuery } from "@tanstack/react-query"
+import { api } from "@/shared/api"
 
-const BRANCHES = [
-  { value: "LENINA_5A", label: "г. Иркутск, ул. Ленина, д. 5А" },
-]
+const DELIVERY_DAYS = 10
+
+type PickupPoint = {
+  code: string
+  label: string
+}
 
 interface CheckoutErrorResponse {
   address?: string | string[]
@@ -65,15 +70,32 @@ const getCheckoutErrors = (error: unknown) => {
   return { form: firstMessage(data?.promocode) || fallback, fields }
 }
 
+const toDeliveryDateTime = (time: string) => {
+  if (!time) return null
+  const [hours, minutes] = time.split(":").map(Number)
+  const date = new Date()
+  date.setDate(date.getDate() + DELIVERY_DAYS)
+  date.setHours(hours || 0, minutes || 0, 0, 0)
+
+  return date.toISOString()
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { data: cart, isLoading: cartLoading } = useGetCart()
   const { data: profile } = useProfile()
   const { mutate: createOrder, isPending } = useCreateOrder()
+  const { data: pickupPoints = [] } = useQuery({
+    queryKey: ["pickup-points"],
+    queryFn: async () => {
+      const { data } = await api.get<PickupPoint[]>("/orders/pickup-points/")
+      return data
+    },
+  })
 
   const [formData, setFormData] = useState({
     delivery_type: "PICKUP" as "PICKUP" | "COURIER",
-    branch: "LENINA_5A",
+    branch: "",
     address: "",
     name: "",
     phone_number: "",
@@ -95,6 +117,12 @@ export default function CheckoutPage() {
       }))
     }
   }, [profile])
+
+  React.useEffect(() => {
+    if (!formData.branch && pickupPoints[0]?.code) {
+      setFormData((prev) => ({ ...prev, branch: pickupPoints[0].code }))
+    }
+  }, [formData.branch, pickupPoints])
 
   if (cartLoading) {
     return (
@@ -127,8 +155,8 @@ export default function CheckoutPage() {
       address: formData.delivery_type === "COURIER" ? formData.address : null,
       date_time_deliver:
         formData.delivery_type === "COURIER" && formData.date_time_deliver
-          ? new Date(formData.date_time_deliver).toISOString()
-          : null,
+          ? toDeliveryDateTime(formData.date_time_deliver)
+          : undefined,
       name: formData.name,
       phone_number: formData.phone_number,
       description: formData.description,
@@ -258,12 +286,17 @@ export default function CheckoutPage() {
                   }
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main focus:ring-1 focus:ring-brand-main outline-none"
                 >
-                  {BRANCHES.map((b) => (
-                    <option key={b.value} value={b.value}>
-                      {b.label}
+                  {pickupPoints.map((point) => (
+                    <option key={point.code} value={point.code}>
+                      {point.label}
                     </option>
                   ))}
                 </select>
+                {fieldErrors.branch && (
+                  <p className="mt-1 text-xs text-red-500">
+                    {fieldErrors.branch}
+                  </p>
+                )}
               </div>
             ) : (
               <div>
@@ -288,7 +321,7 @@ export default function CheckoutPage() {
                   Время доставки *
                 </label>
                 <input
-                  type="datetime-local"
+                  type="time"
                   value={formData.date_time_deliver}
                   onChange={(e) =>
                     setFormData({
@@ -299,6 +332,9 @@ export default function CheckoutPage() {
                   required
                   className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main focus:ring-1 focus:ring-brand-main outline-none"
                 />
+                <p className="mt-1 text-xs text-slate-500">
+                  Примерная дата доставки: через {DELIVERY_DAYS} дней
+                </p>
                 {fieldErrors.date_time_deliver && (
                   <p className="mt-1 text-xs text-red-500">
                     {fieldErrors.date_time_deliver}

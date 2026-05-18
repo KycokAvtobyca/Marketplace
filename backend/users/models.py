@@ -203,3 +203,52 @@ class Shop(SlugifiedNameMixin):
 
     def __str__(self):
         return f"Магазин {self.name}"
+
+
+class ShopModerationRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Action(models.TextChoices):
+        CREATE = "CREATE", "Создание магазина"
+        DELETE = "DELETE", "Удаление магазина"
+
+    class Status(models.TextChoices):
+        NEW = "NEW", "Новая"
+        APPROVED = "APPROVED", "Одобрена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="shop_moderation_requests",
+        verbose_name="Пользователь",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="moderation_requests",
+        verbose_name="Магазин",
+    )
+    action = models.CharField("Действие", max_length=20, choices=Action.choices)
+    status = models.CharField(
+        "Статус", max_length=20, choices=Status.choices, default=Status.NEW
+    )
+    name = models.CharField("Название магазина", max_length=100, blank=True)
+    description = models.TextField("Описание", blank=True, max_length=500)
+    image = models.ImageField(
+        "Изображение",
+        upload_to=UploadPath("shop-requests"),
+        blank=True,
+        null=True,
+    )
+    admin_comment = models.TextField(
+        "Комментарий администратора", blank=True, max_length=1000
+    )
+
+    class Meta:
+        ordering = ["-date_time_create", "-pk"]
+        verbose_name = "Заявка магазина"
+        verbose_name_plural = "Заявки магазинов"
+
+    def __str__(self):
+        return f"{self.get_action_display()} от {self.user}"

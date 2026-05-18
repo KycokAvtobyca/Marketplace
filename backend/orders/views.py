@@ -8,8 +8,8 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from catalog.pagination import DefaultOrderPagination
 
-from .models import Order
-from .serializers import OrderCreateSerializer, OrderSerializer
+from .models import Order, PickupPoint
+from .serializers import OrderCreateSerializer, OrderSerializer, PickupPointSerializer
 
 
 class OrderViewSet(viewsets.ReadOnlyModelViewSet):
@@ -98,3 +98,9 @@ class OrderCreateView(APIView):
                 status=status.HTTP_201_CREATED,
             )
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class PickupPointListView(APIView):
+    def get(self, request):
+        points = PickupPoint.objects.filter(is_active=True)
+        return Response(PickupPointSerializer(points, many=True).data)

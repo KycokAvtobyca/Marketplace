@@ -28,9 +28,6 @@ export default function CreateShopPage() {
       {
         onSuccess: () => {
           setSuccess(true)
-          setTimeout(() => {
-            window.location.href = "http://127.0.0.1:8000/admin-login/"
-          }, 2000)
         },
       }
     )
@@ -50,10 +47,10 @@ export default function CreateShopPage() {
       {success ? (
         <div className="rounded-2xl border border-green-200 bg-green-50 p-4 text-center sm:p-6">
           <p className="text-lg font-bold text-green-700 mb-2">
-            Магазин успешно создан!
+            Заявка отправлена на модерацию!
           </p>
           <p className="text-sm text-green-600">
-            Перенаправление в панель администратора...
+            Магазин появится после одобрения администратором.
           </p>
         </div>
       ) : (

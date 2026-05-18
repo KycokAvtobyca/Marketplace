@@ -2,6 +2,7 @@
 
 import React, { useCallback, useState } from "react"
 import Head from "next/head"
+import Link from "next/link"
 import { useParams, useRouter } from "next/navigation"
 import { useQueryClient } from "@tanstack/react-query"
 import { useAddToCart } from "@/entities/cart/api/useCart"
@@ -30,6 +31,20 @@ const formatPrice = (value: number) =>
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   })
+
+const getVariantLabel = (
+  variant: { sku: string; attribute_values: Array<{ name: string }> },
+  maxLength = 34,
+) => {
+  const label =
+    variant.attribute_values
+      .slice(0, 3)
+      .map((av) => av.name)
+      .filter(Boolean)
+      .join(", ") || variant.sku
+
+  return label.length > maxLength ? `${label.slice(0, maxLength - 1)}...` : label
+}
 
 export default function ProductPage() {
   const params = useParams()
@@ -400,9 +415,12 @@ export default function ProductPage() {
           <div className="min-w-0 space-y-6">
             <div>
               {product.brand && (
-                <p className="text-sm text-slate-500 mb-1">
+                <Link
+                  href={`/brands/${product.brand.slug}`}
+                  className="mb-1 inline-block text-sm text-slate-500 transition hover:text-brand-main hover:underline"
+                >
                   {product.brand.name}
-                </p>
+                </Link>
               )}
               <h1 className="text-2xl sm:text-3xl font-bold">{product.name}</h1>
               <div className="mt-2 flex items-center gap-2 text-sm text-slate-500">
@@ -458,8 +476,7 @@ export default function ProductPage() {
                           : "bg-white text-slate-700 border-slate-200 hover:border-brand-main"
                       }`}
                     >
-                      {variant.attribute_values.map((av) => av.name).join(", ") ||
-                        variant.sku}
+                      {getVariantLabel(variant)}
                     </button>
                   ))}
                 </div>
@@ -476,7 +493,9 @@ export default function ProductPage() {
                     key={av.id}
                     className="flex justify-between text-sm py-1 border-b border-slate-50"
                   >
-                    <span className="text-slate-500">{av.name}</span>
+                    <span className="text-slate-500">
+                      {av.attribute ? `${av.attribute}: ${av.name}` : av.name}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -555,7 +574,12 @@ export default function ProductPage() {
             {product.shop && (
               <div className="p-3 bg-slate-50 rounded-xl">
                 <p className="text-xs text-slate-400">Продавец</p>
-                <p className="font-medium">{product.shop.name}</p>
+                <Link
+                  href={`/shops/${product.shop.slug}`}
+                  className="font-medium transition hover:text-brand-main hover:underline"
+                >
+                  {product.shop.name}
+                </Link>
               </div>
             )}
 

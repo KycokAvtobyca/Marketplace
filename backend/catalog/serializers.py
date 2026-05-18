@@ -86,10 +86,12 @@ class ProductTagsSerializer(serializers.ModelSerializer):
 
 class AttributeValuesSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="value")
+    attribute = serializers.CharField(source="attribute.name", read_only=True)
+    attribute_id = serializers.IntegerField(read_only=True)
 
     class Meta:
         model = AttributeValue
-        fields = ["id", "name"]
+        fields = ["id", "name", "attribute", "attribute_id"]
 
 
 class AttributesSerializer(serializers.ModelSerializer):

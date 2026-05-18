@@ -166,6 +166,7 @@ const USER_APP_ROUTES = {
 
   PHONE_CHANGE: "profile/phone-change/",
   SHOP_CREATE: "shop/create/",
+  SHOP_DELETE_REQUEST: "shop/delete-request/",
   MY_SHOP: "shop/my/",
 }
 

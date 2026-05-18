@@ -3,7 +3,7 @@ from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from import_export.admin import ImportExportModelAdmin
 
 from .forms import CustomUserChangeForm, CustomUserCreationForm
-from .models import CustomUser, Shop, SMSCode
+from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
 
 
 @admin.register(CustomUser)
@@ -182,6 +182,45 @@ class ShopAdmin(ImportExportModelAdmin):
         """
         # Все пользователи (включая обычных) могут создавать магазины
         return True
+
+
+@admin.register(ShopModerationRequest)
+class ShopModerationRequestAdmin(admin.ModelAdmin):
+    list_display = ("id", "action", "user", "shop", "name", "status", "date_time_create")
+    list_filter = ("action", "status", "date_time_create")
+    search_fields = ("name", "description", "user__phone_number", "shop__name")
+    readonly_fields = ("user", "shop", "action", "name", "description", "image", "date_time_create", "date_time_update")
+
+    def save_model(self, request, obj, form, change):
+        old_status = None
+        if change and obj.pk:
+            old_status = type(obj).objects.only("status").get(pk=obj.pk).status
+
+        super().save_model(request, obj, form, change)
+
+        if old_status == obj.status or obj.status != ShopModerationRequest.Status.APPROVED:
+            return
+
+        if obj.action == ShopModerationRequest.Action.CREATE:
+            shop = Shop.objects.create(
+                owner=obj.user,
+                name=obj.name,
+                description=obj.description,
+                image=obj.image,
+                is_active=True,
+            )
+            obj.shop = shop
+            obj.save(update_fields=["shop", "date_time_update"])
+            if not obj.user.is_staff:
+                obj.user.is_staff = True
+                obj.user.save(update_fields=["is_staff", "date_time_update"])
+
+        if obj.action == ShopModerationRequest.Action.DELETE and obj.shop_id:
+            user = obj.user
+            obj.shop.delete()
+            if not Shop.objects.filter(owner=user).exists() and not user.is_superuser:
+                user.is_staff = False
+                user.save(update_fields=["is_staff", "date_time_update"])
 
 
 @admin.register(SMSCode)

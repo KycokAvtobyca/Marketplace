@@ -197,6 +197,85 @@ class AttributeValueAdmin(ShopReferenceAdminMixin, admin.ModelAdmin):
         return request.user.is_superuser
 
 
+@admin.register(models.AttributeRequest)
+class AttributeRequestAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "shop",
+        "requester",
+        "attribute",
+        "attribute_name",
+        "value",
+        "status",
+        "date_time_create",
+    )
+    list_filter = ("status", "date_time_create")
+    search_fields = (
+        "attribute__name",
+        "attribute_name",
+        "value",
+        "comment",
+        "shop__name",
+        "requester__phone_number",
+    )
+    autocomplete_fields = ("attribute",)
+    readonly_fields = ("requester", "shop", "date_time_create", "date_time_update")
+    list_per_page = 30
+
+    def _get_user_shop(self, request):
+        if request.user.is_superuser:
+            return None
+        if not hasattr(request.user, "shop"):
+            return None
+        return request.user.shop.first()
+
+    def get_queryset(self, request):
+        qs = super().get_queryset(request).select_related(
+            "requester", "shop", "attribute"
+        )
+        if request.user.is_superuser:
+            return qs
+        shop = self._get_user_shop(request)
+        if shop:
+            return qs.filter(shop=shop)
+        return qs.none()
+
+    def get_readonly_fields(self, request, obj=None):
+        fields = list(super().get_readonly_fields(request, obj))
+        if not request.user.is_superuser:
+            fields.extend(["status", "admin_comment"])
+            if obj:
+                fields.extend(["attribute", "attribute_name", "value", "comment"])
+        return tuple(dict.fromkeys(fields))
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser or bool(self._get_user_shop(request))
+
+    def has_view_permission(self, request, obj=None):
+        if request.user.is_superuser:
+            return True
+        shop = self._get_user_shop(request)
+        if not shop:
+            return False
+        return obj is None or obj.shop_id == shop.id
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser or bool(self._get_user_shop(request))
+
+    def has_change_permission(self, request, obj=None):
+        return self.has_view_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.requester = request.user
+            if not request.user.is_superuser:
+                obj.shop = self._get_user_shop(request)
+        super().save_model(request, obj, form, change)
+
+
 class ProductImageInline(admin.StackedInline):
     model = models.ProductImage
     extra = 0

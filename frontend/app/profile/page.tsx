@@ -5,6 +5,7 @@ import { useProfile } from "@/entities/user/api/useProfile"
 import { useUpdateProfile } from "@/entities/user/api/useUpdateProfile"
 import { usePhoneChange } from "@/entities/user/api/usePhoneChange"
 import { useMyShop } from "@/entities/user/api/useMyShop"
+import { useDeleteShopRequest } from "@/entities/user/api/useDeleteShopRequest"
 import { useCheckAdminAccess, useRedirectToAdmin } from "@/entities/user"
 import { useOrders } from "@/entities/orders/api/useOrders"
 import { useCancelOrder } from "@/entities/orders/api/useCancelOrder"
@@ -16,12 +17,20 @@ type ApiError = {
   response?: { data?: { detail?: string; phone_number?: string } }
 }
 
+const isValidEmail = (value: string) => {
+  if (!value) return true
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(value)
+}
+
 export default function ProfilePage() {
   const queryClient = useQueryClient()
   const { data: profile, isLoading } = useProfile()
   const { mutate: updateProfile, isPending: isUpdating } = useUpdateProfile()
   const { mutate: phoneChange, isPending: isPhoneChanging } = usePhoneChange()
   const { data: shop } = useMyShop()
+  const { mutate: requestShopDelete, isPending: isRequestingShopDelete } =
+    useDeleteShopRequest()
+  const [shopDeleteMessage, setShopDeleteMessage] = useState("")
   const { data: orders } = useOrders()
   const { mutate: cancelOrder, isPending: isCanceling } = useCancelOrder()
   const { data: hasAdminAccess } = useCheckAdminAccess()
@@ -43,6 +52,7 @@ export default function ProfilePage() {
   const [newPhone, setNewPhone] = useState("")
   const [newCode, setNewCode] = useState("")
   const [phoneError, setPhoneError] = useState("")
+  const [emailError, setEmailError] = useState("")
 
   React.useEffect(() => {
     if (profile) {
@@ -74,6 +84,11 @@ export default function ProfilePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setEmailError("")
+    if (!isValidEmail(formData.email.trim())) {
+      setEmailError("Введите корректный email, например name@example.com.")
+      return
+    }
     updateProfile(formData, {
       onSuccess: () => alert("Данные успешно сохранены!"),
     })
@@ -226,6 +241,9 @@ export default function ProfilePage() {
               }
               className="w-full px-4 py-2 rounded-xl border border-slate-200 focus:border-brand-main focus:ring-1 focus:ring-brand-main outline-none"
             />
+            {emailError && (
+              <p className="mt-1 text-xs text-red-500">{emailError}</p>
+            )}
           </div>
           <div className="sm:col-span-2">
             <label className="block text-sm font-medium text-slate-600 mb-1">
@@ -363,7 +381,12 @@ export default function ProfilePage() {
         <h2 className="text-lg font-bold mb-4">🏪 Магазин</h2>
         {shop ? (
           <div className="space-y-3">
-            <p className="font-medium">{shop.name}</p>
+            <Link
+              href={`/shops/${shop.slug}`}
+              className="inline-block font-medium transition hover:text-brand-main hover:underline"
+            >
+              {shop.name}
+            </Link>
             <p className="text-sm text-slate-500">{shop.description}</p>
             {hasAdminAccess && (
               <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
@@ -380,7 +403,29 @@ export default function ProfilePage() {
                 >
                   {isRedirecting ? "Переход..." : "Панель администратора"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    requestShopDelete(undefined, {
+                      onSuccess: () =>
+                        setShopDeleteMessage(
+                          "Заявка на удаление магазина отправлена на модерацию.",
+                        ),
+                      onError: () =>
+                        setShopDeleteMessage(
+                          "Не удалось отправить заявку на удаление магазина.",
+                        ),
+                    })
+                  }
+                  disabled={isRequestingShopDelete}
+                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl border border-red-200 px-4 py-2 text-sm font-medium text-red-600 transition-all hover:bg-red-50 disabled:opacity-50 sm:w-auto"
+                >
+                  {isRequestingShopDelete ? "Отправка..." : "Запросить удаление"}
+                </button>
               </div>
+            )}
+            {shopDeleteMessage && (
+              <p className="text-sm text-slate-500">{shopDeleteMessage}</p>
             )}
           </div>
         ) : (
