@@ -9,7 +9,9 @@ from django.core.validators import (
     MinLengthValidator,
     MinValueValidator,
 )
-from django.db import models, transaction
+from django.db import connection, models, transaction
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.utils import timezone
 from django.utils.functional import cached_property
 
@@ -96,17 +98,10 @@ class Review(DateTimeCreateMixin, DateTimeUpdateMixin):
             return False
 
         # Разрешаем отзывы для всех статусов, при которых товар уже доставлен
-        allowed_statuses = [
-            Order.Status.DELIVERING,
-            Order.Status.READY_FOR_PICKUP,
-            Order.Status.COMPLETED,
-            Order.Status.PAID,
-        ]
-
         exists = OrderItem.objects.filter(
             order__user_id=self.user_id,
             product_variant_id=self.product_variant_id,
-            order__status__in=allowed_statuses,
+            order__status=Order.Status.PAID,
         ).exists()
 
         return exists
@@ -175,6 +170,17 @@ class ReviewVote(DateTimeCreateMixin, DateTimeUpdateMixin):
 
 
 class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class ModerationStatus(models.TextChoices):
+        PENDING = "PENDING", "На модерации"
+        APPROVED = "APPROVED", "Одобрен"
+        REJECTED = "REJECTED", "Отклонен"
+
+    class AnswerStatus(models.TextChoices):
+        NONE = "NONE", "Нет ответа"
+        PENDING = "PENDING", "Ответ на модерации"
+        APPROVED = "APPROVED", "Ответ одобрен"
+        REJECTED = "REJECTED", "Ответ отклонен"
+
     product = models.ForeignKey(
         "catalog.Product",
         on_delete=models.CASCADE,
@@ -194,6 +200,25 @@ class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
         validators=[MinLengthValidator(5)],
     )
     answer = models.TextField("Ответ продавца", max_length=2000, blank=True)
+    pending_answer = models.TextField(
+        "Ответ продавца на модерации",
+        max_length=2000,
+        blank=True,
+    )
+    question_status = models.CharField(
+        "Статус модерации вопроса",
+        max_length=20,
+        choices=ModerationStatus.choices,
+        default=ModerationStatus.PENDING,
+        db_index=True,
+    )
+    answer_status = models.CharField(
+        "Статус модерации ответа",
+        max_length=20,
+        choices=AnswerStatus.choices,
+        default=AnswerStatus.NONE,
+        db_index=True,
+    )
     answered_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -203,7 +228,7 @@ class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
         verbose_name="Ответил",
     )
     answered_at = models.DateTimeField("Дата ответа", null=True, blank=True)
-    is_public = models.BooleanField("Показывать на сайте", default=True)
+    is_public = models.BooleanField("Показывать на сайте", default=False)
 
     class Meta:
         verbose_name = "Вопрос о товаре"
@@ -215,20 +240,60 @@ class ProductQuestion(DateTimeCreateMixin, DateTimeUpdateMixin):
         ]
 
     def set_answer(self, user, answer):
-        self.answer = answer.strip()
+        self.pending_answer = answer.strip()
         self.answered_by = user
         self.answered_at = timezone.now()
+        self.answer_status = self.AnswerStatus.PENDING
         self.save(
             update_fields=[
-                "answer",
+                "pending_answer",
+                "answer_status",
                 "answered_by",
                 "answered_at",
                 "date_time_update",
             ]
         )
 
+    def approve_answer(self):
+        if self.pending_answer:
+            self.answer = self.pending_answer
+            self.answer_status = self.AnswerStatus.APPROVED
+
+    def save(self, *args, **kwargs):
+        self.is_public = self.question_status == self.ModerationStatus.APPROVED
+        if self.answer_status == self.AnswerStatus.APPROVED and self.pending_answer:
+            self.answer = self.pending_answer
+        if not self.pending_answer and self.answer_status != self.AnswerStatus.NONE:
+            self.answer_status = self.AnswerStatus.NONE
+        update_fields = kwargs.get("update_fields")
+        if update_fields is not None:
+            update_fields = set(update_fields)
+            update_fields.add("is_public")
+            update_fields.add("answer_status")
+            if self.answer_status == self.AnswerStatus.APPROVED and self.pending_answer:
+                update_fields.add("answer")
+            kwargs["update_fields"] = list(update_fields)
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"Вопрос #{self.pk} к товару {self.product_id}"
+
+
+@receiver(pre_delete, sender=ProductQuestion)
+def delete_legacy_product_question_moderation_rows(sender, instance, **kwargs):
+    legacy_tables = (
+        "reviews_answermoderationrequest",
+        "reviews_questionmoderationrequest",
+    )
+    table_names = set(connection.introspection.table_names())
+    with connection.cursor() as cursor:
+        for table in legacy_tables:
+            if table in table_names:
+                quoted_table = connection.ops.quote_name(table)
+                cursor.execute(
+                    f"DELETE FROM {quoted_table} WHERE question_id = %s",
+                    [instance.pk],
+                )
 
 
 class ReviewImage(models.Model):

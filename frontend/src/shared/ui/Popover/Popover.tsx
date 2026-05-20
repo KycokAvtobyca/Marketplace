@@ -185,7 +185,7 @@ export const Popover = ({
         minWidth: `${coords.minWidth}px`,
       }}
       className={clsx(
-        "w-max max-w-[calc(100vw-1rem)] rounded-xl bg-default opacity-0 shadow-default transition-opacity duration-300",
+        "w-max max-w-[calc(100vw-1rem)] rounded-xl bg-white opacity-0 shadow-default transition-opacity duration-300",
         isVisible
           ? "opacity-100 pointer-events-auto"
           : "opacity-0 pointer-events-none",

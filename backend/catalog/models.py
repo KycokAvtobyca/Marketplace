@@ -224,6 +224,7 @@ class ProductType(SlugifiedNameMixin):
 
 class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
     class TargetType(models.TextChoices):
+        BRAND = "BRAND", "Бренд"
         PRODUCT_TYPE = "PRODUCT_TYPE", "Тип продукта"
         CATEGORY = "CATEGORY", "Категория"
         PRODUCT_TAG = "PRODUCT_TAG", "Тег продукта"
@@ -311,6 +312,34 @@ class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
             models.Index(fields=["shop", "status"]),
         ]
 
+    brand_description = models.TextField(
+        "Описание бренда",
+        max_length=5000,
+        blank=True,
+        help_text="Заполняется только для заявки на бренд.",
+    )
+    brand_image = models.ImageField(
+        "Изображение бренда",
+        upload_to=UploadPath(prefix="brands"),
+        blank=True,
+        null=True,
+        help_text="Заполняется только для заявки на бренд.",
+    )
+    attribute_values_text = models.TextField(
+        "Атрибуты и значения",
+        max_length=4000,
+        blank=True,
+        help_text="Для бренда. Один атрибут на строку: Цвет: Красный, Синий",
+    )
+    created_brand = models.ForeignKey(
+        Brand,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_catalog_requests",
+        verbose_name="Созданный бренд",
+    )
+
     def __str__(self):
         return f"{self.get_target_type_display()}: {self.name}"
 
@@ -320,7 +349,37 @@ class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
             self.created_product_type
             or self.created_category
             or self.created_product_tag
+            or self.created_brand
         )
+
+    def parse_attribute_values_text(self):
+        rows = []
+        for line in (self.attribute_values_text or "").splitlines():
+            line = line.strip()
+            if not line:
+                continue
+            if ":" not in line:
+                raise ValidationError(
+                    {
+                        "attribute_values_text": (
+                            "Укажите атрибуты в формате "
+                            "'Атрибут: значение 1, значение 2'."
+                        )
+                    }
+                )
+            attribute_name, raw_values = line.split(":", 1)
+            attribute_name = attribute_name.strip()
+            values = [
+                value.strip()
+                for value in raw_values.replace(";", ",").split(",")
+                if value.strip()
+            ]
+            if not attribute_name:
+                raise ValidationError(
+                    {"attribute_values_text": "Укажите название атрибута."}
+                )
+            rows.append((attribute_name, values))
+        return rows
 
     def clean(self):
         super().clean()
@@ -381,6 +440,44 @@ class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
                 self.created_product_type = None
                 self.created_category = None
 
+            elif self.target_type == self.TargetType.BRAND:
+                obj = Brand.objects.filter(name__iexact=self.name).first()
+                if obj is None:
+                    obj = Brand.objects.create(
+                        name=self.name,
+                        description=self.brand_description,
+                        image=self.brand_image,
+                    )
+                else:
+                    update_fields = []
+                    if self.brand_description and obj.description != self.brand_description:
+                        obj.description = self.brand_description
+                        update_fields.append("description")
+                    if self.brand_image and obj.image != self.brand_image:
+                        obj.image = self.brand_image
+                        update_fields.append("image")
+                    if update_fields:
+                        obj.save(update_fields=update_fields)
+
+                for attribute_name, values in self.parse_attribute_values_text():
+                    attribute, created = Attribute.objects.get_or_create(
+                        name=attribute_name,
+                        defaults={"is_active": True},
+                    )
+                    if not created and not attribute.is_active:
+                        attribute.is_active = True
+                        attribute.save(update_fields=["is_active"])
+                    for value in values:
+                        AttributeValue.objects.get_or_create(
+                            attribute=attribute,
+                            value=value,
+                        )
+
+                self.created_brand = obj
+                self.created_product_type = None
+                self.created_category = None
+                self.created_product_tag = None
+
             self.status = self.Status.APPROVED
             self.save(
                 update_fields=[
@@ -388,11 +485,77 @@ class CatalogItemRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
                     "created_product_type",
                     "created_category",
                     "created_product_tag",
+                    "created_brand",
                     "date_time_update",
                 ]
             )
 
         return self.created_object
+
+
+class BrandRequest(DateTimeCreateMixin, DateTimeUpdateMixin):
+    class Status(models.TextChoices):
+        NEW = "NEW", "Новая"
+        APPROVED = "APPROVED", "Одобрена"
+        REJECTED = "REJECTED", "Отклонена"
+
+    requester = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name="brand_requests",
+        verbose_name="Заявитель",
+    )
+    shop = models.ForeignKey(
+        Shop,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="brand_requests",
+        verbose_name="Магазин",
+    )
+    name = models.CharField(
+        "Название бренда",
+        max_length=50,
+        validators=[MinLengthValidator(2)],
+    )
+    description = models.TextField("Описание бренда", max_length=5000, blank=True)
+    image = models.ImageField(
+        "Изображение бренда",
+        upload_to=UploadPath(prefix="brands"),
+        blank=True,
+        null=True,
+    )
+    comment = models.TextField("Комментарий магазина", max_length=1000, blank=True)
+    status = models.CharField(
+        "Статус",
+        max_length=20,
+        choices=Status.choices,
+        default=Status.NEW,
+    )
+    admin_comment = models.TextField(
+        "Комментарий администратора", max_length=1000, blank=True
+    )
+    created_brand = models.ForeignKey(
+        Brand,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="source_requests",
+        verbose_name="Созданный бренд",
+    )
+
+    class Meta:
+        ordering = ["-date_time_create", "-pk"]
+        verbose_name = "Заявка на создание бренда"
+        verbose_name_plural = "Заявки на создание брендов"
+        indexes = [
+            models.Index(fields=["status", "-date_time_create"]),
+            models.Index(fields=["shop", "status"]),
+        ]
+
+    def __str__(self):
+        return self.name
 
 
 # Общая карточка

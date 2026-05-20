@@ -10,7 +10,7 @@ type Brand = {
   name: string
   slug: string
   description?: string
-  image?: string
+  image?: string | null
 }
 
 export default function BrandPage() {

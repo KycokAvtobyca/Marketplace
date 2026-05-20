@@ -1,12 +1,13 @@
 from decimal import Decimal
 
 from catalog.models import Product, ProductVariant
+from django.db import connection
 from django.test import TestCase
 from orders.models import Order, OrderItem
 from rest_framework.test import APIClient
 from users.models import CustomUser, Shop
 
-from .models import ProductComplaint, Review, ReviewComplaint
+from .models import ProductComplaint, ProductQuestion, Review, ReviewComplaint
 
 
 class ReviewApiTests(TestCase):
@@ -33,7 +34,7 @@ class ReviewApiTests(TestCase):
             is_active=True,
         )
 
-    def _completed_order(self, status=Order.Status.COMPLETED):
+    def _completed_order(self, status=Order.Status.PAID):
         order = Order.objects.create(
             user=self.user,
             status=status,
@@ -67,7 +68,7 @@ class ReviewApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
 
-        self._completed_order()
+        self._completed_order(status=Order.Status.PAID)
         response = client.post(
             "/api/v1/reviews/",
             {
@@ -107,6 +108,23 @@ class ReviewApiTests(TestCase):
 
         self.assertEqual(response.status_code, 201, response.data)
 
+    def test_user_cannot_review_before_paid_after_receipt_status(self):
+        self._completed_order(status=Order.Status.COMPLETED)
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        response = client.post(
+            "/api/v1/reviews/",
+            {
+                "product_variant": self.variant.pk,
+                "rating": 5,
+                "description": "Товар получен, но еще не оплачен после получения",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+
     def test_public_list_contains_only_approved_reviews(self):
         self._completed_order()
         Review.objects.create(
@@ -120,6 +138,14 @@ class ReviewApiTests(TestCase):
 
         client = APIClient()
         response = client.get(f"/api/v1/reviews/?product={self.product.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+        self.shop_owner.is_staff = True
+        self.shop_owner.save(update_fields=["is_staff", "date_time_update"])
+        seller_client = APIClient()
+        seller_client.force_authenticate(user=self.shop_owner)
+        response = seller_client.get(f"/api/v1/reviews/?product={self.product.pk}")
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
 
@@ -163,6 +189,11 @@ class ReviewApiTests(TestCase):
 
         response = client.get(f"/api/v1/reviews/?product={self.product.pk}")
         self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["status"], Review.Status.PENDING)
+
+        response = APIClient().get(f"/api/v1/reviews/?product={self.product.pk}")
+        self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["results"], [])
 
     def test_authenticated_user_can_report_review_and_product_once(self):
@@ -205,3 +236,115 @@ class ReviewApiTests(TestCase):
         )
         self.assertEqual(response.status_code, 201, response.data)
         self.assertEqual(ProductComplaint.objects.count(), 1)
+
+    def test_question_is_visible_publicly_only_after_moderation(self):
+        client = APIClient()
+        client.force_authenticate(user=self.user)
+
+        response = client.post(
+            "/api/v1/reviews/questions/",
+            {"product": self.product.pk, "text": "Есть ли гарантия на товар?"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        question = ProductQuestion.objects.get()
+        self.assertEqual(question.question_status, ProductQuestion.ModerationStatus.PENDING)
+        self.assertFalse(question.is_public)
+
+        anonymous = APIClient()
+        response = anonymous.get(f"/api/v1/reviews/questions/?product={self.product.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["results"], [])
+
+        response = client.get(f"/api/v1/reviews/questions/?product={self.product.pk}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(
+            response.data["results"][0]["question_status"],
+            ProductQuestion.ModerationStatus.PENDING,
+        )
+
+    def test_seller_answer_is_public_only_after_moderation(self):
+        self.shop_owner.is_staff = True
+        self.shop_owner.save(update_fields=["is_staff", "date_time_update"])
+        question = ProductQuestion.objects.create(
+            product=self.product,
+            user=self.user,
+            text="Подойдет ли товар для зимы?",
+        )
+        question.question_status = ProductQuestion.ModerationStatus.APPROVED
+        question.save(update_fields=["question_status"])
+
+        seller_client = APIClient()
+        seller_client.force_authenticate(user=self.shop_owner)
+        response = seller_client.post(
+            f"/api/v1/reviews/questions/{question.pk}/answer/",
+            {"answer": "Да, товар подходит для зимы."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        question.refresh_from_db()
+        self.assertEqual(question.answer_status, ProductQuestion.AnswerStatus.PENDING)
+        self.assertEqual(question.answer, "")
+
+        public_response = APIClient().get(
+            f"/api/v1/reviews/questions/?product={self.product.pk}"
+        )
+        self.assertEqual(public_response.status_code, 200)
+        self.assertEqual(public_response.data["results"][0]["answer"], "")
+
+        seller_response = seller_client.get(
+            f"/api/v1/reviews/questions/?product={self.product.pk}"
+        )
+        self.assertEqual(seller_response.status_code, 200)
+        self.assertEqual(seller_response.data["results"][0]["answer"], "")
+
+        question.answer_status = ProductQuestion.AnswerStatus.APPROVED
+        question.save(update_fields=["answer_status"])
+
+        public_response = APIClient().get(
+            f"/api/v1/reviews/questions/?product={self.product.pk}"
+        )
+        self.assertEqual(public_response.status_code, 200)
+        self.assertEqual(
+            public_response.data["results"][0]["answer"],
+            "Да, товар подходит для зимы.",
+        )
+
+    def test_question_delete_removes_legacy_answer_moderation_rows(self):
+        question = ProductQuestion.objects.create(
+            product=self.product,
+            user=self.user,
+            text="Вопрос для удаления?",
+        )
+        table = connection.ops.quote_name("reviews_answermoderationrequest")
+        question_table = connection.ops.quote_name("reviews_productquestion")
+        id_column = (
+            "BIGSERIAL PRIMARY KEY"
+            if connection.vendor == "postgresql"
+            else "INTEGER PRIMARY KEY AUTOINCREMENT"
+        )
+
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP TABLE IF EXISTS {table}")
+            cursor.execute(
+                f"CREATE TABLE {table} ("
+                f"id {id_column}, "
+                f"question_id bigint NOT NULL REFERENCES {question_table}(id)"
+                f")"
+            )
+            cursor.execute(
+                f"INSERT INTO {table} (question_id) VALUES (%s)",
+                [question.pk],
+            )
+
+        try:
+            question.delete()
+            with connection.cursor() as cursor:
+                cursor.execute(f"SELECT COUNT(*) FROM {table}")
+                self.assertEqual(cursor.fetchone()[0], 0)
+        finally:
+            with connection.cursor() as cursor:
+                cursor.execute(f"DROP TABLE IF EXISTS {table}")

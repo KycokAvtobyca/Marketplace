@@ -1,12 +1,17 @@
 from decimal import Decimal
+import shutil
+import tempfile
 
-from django.test import Client, TestCase
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client, TestCase, override_settings
+from marketing.models import Discount
 from rest_framework.test import APIClient
 from users.models import CustomUser, Shop
 
 from .models import (
     Attribute,
     AttributeValue,
+    Brand,
     CatalogItemRequest,
     Category,
     Product,
@@ -134,6 +139,78 @@ class ProductCatalogFilterTests(TestCase):
         self.assertEqual(ids, {self.product.pk})
 
 
+class ProductDetailPriceTests(TestCase):
+    def test_detail_variant_uses_discounted_price(self):
+        user = CustomUser.objects.create_user("89642297630")
+        shop = Shop.objects.create(
+            owner=user,
+            name="Price Shop",
+            slug="price-shop",
+            is_active=True,
+        )
+        product = Product.objects.create(
+            name="Discounted Product",
+            slug="discounted-product",
+            description="Test product description",
+            shop=shop,
+        )
+        variant = ProductVariant.objects.create(
+            product=product,
+            price=Decimal("1000.00"),
+            stock=3,
+            is_active=True,
+            is_main=True,
+        )
+        Discount.objects.create(
+            name="Quarter Off",
+            product_variant=variant,
+            is_active=True,
+            discount_percentage=Decimal("0.25"),
+        )
+
+        response = APIClient().get(
+            f"/api/v1/catalog/products/{product.pk}/",
+            {"variants_flag": "true"},
+        )
+
+        self.assertEqual(response.status_code, 200, response.data)
+        response_variant = response.data["variants"][0]
+        self.assertEqual(response_variant["final_price"], "750.00")
+        self.assertEqual(response_variant["old_price"], "1000.00")
+        self.assertTrue(response_variant["has_discount"])
+
+
+class BrandApiTests(TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.media_root = tempfile.mkdtemp()
+        cls.override = override_settings(MEDIA_ROOT=cls.media_root)
+        cls.override.enable()
+        super().setUpClass()
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        cls.override.disable()
+        shutil.rmtree(cls.media_root, ignore_errors=True)
+
+    def test_brand_detail_returns_absolute_image_url(self):
+        brand = Brand.objects.create(
+            name="Logo Brand",
+            slug="logo-brand",
+            image=SimpleUploadedFile(
+                "logo.png",
+                b"brand-logo",
+                content_type="image/png",
+            ),
+        )
+
+        response = APIClient().get(f"/api/v1/catalog/brands/{brand.slug}/")
+
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertTrue(response.data["image"].startswith("http://testserver/media/"))
+
+
 class CatalogItemRequestTests(TestCase):
     def setUp(self):
         self.user = CustomUser.objects.create_user("89642297629")
@@ -190,4 +267,18 @@ class CatalogItemRequestTests(TestCase):
             name="Новинка",
         )
         tag_request.approve()
+        brand_request = CatalogItemRequest.objects.create(
+            requester=self.user,
+            shop=self.shop,
+            target_type=CatalogItemRequest.TargetType.BRAND,
+            name="Test Brand",
+            brand_description="Brand description",
+            attribute_values_text="Material: Cotton, Wool\nSize: M, L",
+        )
+        brand_request.approve()
+
+        self.assertTrue(Brand.objects.filter(name="Test Brand").exists())
+        self.assertTrue(Attribute.objects.filter(name="Material", is_active=True).exists())
+        self.assertTrue(AttributeValue.objects.filter(value="Cotton").exists())
+        self.assertTrue(AttributeValue.objects.filter(value="L").exists())
         self.assertTrue(ProductTag.objects.filter(name="Новинка").exists())

@@ -38,14 +38,20 @@ class ProductQuestionAdmin(admin.ModelAdmin):
         "id",
         "product",
         "user",
-        "is_public",
+        "question_status",
+        "answer_status",
         "answered_by",
         "answered_at",
     )
-    search_fields = ("product__name", "user__phone_number", "text", "answer")
-    list_filter = ("is_public", "answered_at", "date_time_create")
+    search_fields = ("product__name", "user__phone_number", "text", "answer", "pending_answer")
+    list_filter = ("question_status", "answer_status", "answered_at", "date_time_create")
     readonly_fields = ("user", "date_time_create", "date_time_update", "answered_at")
     autocomplete_fields = ("product",)
+
+    def save_model(self, request, obj, form, change):
+        if obj.answer_status == models.ProductQuestion.AnswerStatus.APPROVED:
+            obj.approve_answer()
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(models.ReviewComplaint)

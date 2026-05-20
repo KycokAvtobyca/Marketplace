@@ -23,7 +23,7 @@ from users.serializers import (
     UserUpdateSerializer,
 )
 
-from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
+from .models import CustomUser, PhoneBan, Shop, ShopModerationRequest, SMSCode
 from .throttling import (
     # AuthTokenByPhone,
     # AuthTokenIPThrottle,
@@ -122,6 +122,16 @@ class SendSMSView(APIView):
             return Response(
                 {"phone_number": str(exc)},
                 status=status.HTTP_400_BAD_REQUEST,
+            )
+        if PhoneBan.is_phone_banned(phone_normalized):
+            return Response(
+                {
+                    "detail": {
+                        "message": "Ваш номер телефона заблокирован.",
+                        "code": "user_blocked",
+                    }
+                },
+                status=status.HTTP_403_FORBIDDEN,
             )
 
         # last_code = SMSCode.objects.filter(
@@ -234,6 +244,11 @@ class PhoneChangeView(APIView):
                     {"phone_number": str(exc)},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
+            if PhoneBan.is_phone_banned(new_phone):
+                return Response(
+                    {"phone_number": "Этот номер телефона заблокирован."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
 
             if CustomUser.objects.filter(phone_number=new_phone).exclude(
                 pk=request.user.pk
@@ -265,6 +280,11 @@ class PhoneChangeView(APIView):
             except PhoneValidationError as exc:
                 return Response(
                     {"phone_number": str(exc)},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            if PhoneBan.is_phone_banned(new_phone):
+                return Response(
+                    {"phone_number": "Этот номер телефона заблокирован."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
             code = request.data.get("code")

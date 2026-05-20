@@ -56,10 +56,6 @@ class ReviewViewSet(viewsets.ModelViewSet):
             qs = qs.filter(product_variant__product_id=product_id)
 
         user = self.request.user
-        if user and user.is_staff:
-            return qs
-        if product_id or product_variant_id:
-            return qs.filter(status=Review.Status.APPROVED)
         if user and user.is_authenticated:
             return qs.filter(Q(status=Review.Status.APPROVED) | Q(user=user))
         return qs.filter(status=Review.Status.APPROVED)
@@ -153,7 +149,7 @@ class ProductQuestionViewSet(viewsets.ModelViewSet):
         if user and user.is_staff:
             if user.is_superuser:
                 return qs
-            return qs.filter(Q(is_public=True) | Q(product__shop__owner=user))
+            return qs.filter(is_public=True)
         if user and user.is_authenticated:
             return qs.filter(Q(is_public=True) | Q(user=user))
         return qs.filter(is_public=True)
@@ -169,6 +165,12 @@ class ProductQuestionViewSet(viewsets.ModelViewSet):
             return Response(
                 {"detail": "Ответить может только продавец этого товара."},
                 status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if question.question_status != ProductQuestion.ModerationStatus.APPROVED:
+            return Response(
+                {"detail": "Ответить можно только на одобренный вопрос."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         answer = (request.data.get("answer") or "").strip()

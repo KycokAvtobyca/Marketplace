@@ -140,6 +140,12 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
     user_id = serializers.IntegerField(source="user.id", read_only=True)
     product_name = serializers.CharField(source="product.name", read_only=True)
     answered_by_name = serializers.SerializerMethodField()
+    question_status_display = serializers.CharField(
+        source="get_question_status_display", read_only=True
+    )
+    answer_status_display = serializers.CharField(
+        source="get_answer_status_display", read_only=True
+    )
     moderation_status = serializers.SerializerMethodField()
     answer_moderation_status = serializers.SerializerMethodField()
 
@@ -156,6 +162,10 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
             "answered_by_name",
             "answered_at",
             "is_public",
+            "question_status",
+            "question_status_display",
+            "answer_status",
+            "answer_status_display",
             "moderation_status",
             "answer_moderation_status",
             "date_time_create",
@@ -170,6 +180,10 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
             "answered_by_name",
             "answered_at",
             "is_public",
+            "question_status",
+            "question_status_display",
+            "answer_status",
+            "answer_status_display",
             "moderation_status",
             "answer_moderation_status",
             "date_time_create",
@@ -188,56 +202,22 @@ class ProductQuestionSerializer(serializers.ModelSerializer):
         return shop.name if shop else obj.answered_by.name or "Продавец"
 
     def get_answer(self, obj):
-        if not obj.answer:
-            return ""
-
-        request = self.context.get("request")
-
-        moderation_manager = getattr(obj, "answer_moderation_requests", None)
-        if moderation_manager is None:
+        if obj.answer_status == ProductQuestion.AnswerStatus.APPROVED:
             return obj.answer
-
-        answer_moderation = moderation_manager.first()
-        if not answer_moderation:
-            return obj.answer
-
-        if getattr(answer_moderation, "status", None) == "APPROVED":
-            return obj.answer
-
-        if (
-            request
-            and request.user
-            and request.user.is_authenticated
-            and (
-                request.user.is_staff
-                or request.user.is_superuser
-                or request.user == obj.user
-                or (obj.product.shop and obj.product.shop.owner_id == request.user.id)
-            )
-        ):
-            return obj.answer
-
         return ""
 
     def get_moderation_status(self, obj):
-        moderation = getattr(obj, "moderation_request", None)
-        if not moderation:
-            return None
         return {
-            "status": moderation.status,
-            "label": moderation.get_status_display(),
-            "comment": moderation.admin_comment,
+            "status": obj.question_status,
+            "label": obj.get_question_status_display(),
         }
 
     def get_answer_moderation_status(self, obj):
-        moderation_manager = getattr(obj, "answer_moderation_requests", None)
-        moderation = moderation_manager.first() if moderation_manager else None
-        if not moderation:
+        if obj.answer_status == ProductQuestion.AnswerStatus.NONE:
             return None
         return {
-            "status": moderation.status,
-            "label": moderation.get_status_display(),
-            "comment": moderation.admin_comment,
+            "status": obj.answer_status,
+            "label": obj.get_answer_status_display(),
         }
 
     def create(self, validated_data):

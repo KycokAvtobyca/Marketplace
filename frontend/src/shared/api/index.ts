@@ -10,6 +10,18 @@ export const api: AxiosInstance = axios.create({
   xsrfHeaderName: "X-CSRFToken",
 })
 
+const BLOCKED_PATH = "/blocked"
+
+const isBlockedPage = () =>
+  typeof window !== "undefined" && window.location.pathname === BLOCKED_PATH
+
+api.interceptors.request.use((config) => {
+  if (isBlockedPage()) {
+    return Promise.reject(new axios.CanceledError("Account is blocked"))
+  }
+  return config
+})
+
 api.interceptors.response.use(
   (response) => response,
   async (error) => {
@@ -17,14 +29,15 @@ api.interceptors.response.use(
     const errorCode = error.response?.data?.detail?.code || error.response?.data?.code
 
     if (errorCode === "user_blocked") {
-      if (typeof window !== "undefined") {
-        window.location.href = "/blocked"
+      if (typeof window !== "undefined" && window.location.pathname !== BLOCKED_PATH) {
+        window.location.replace(BLOCKED_PATH)
       }
       return Promise.reject(error)
     }
 
     // Ловим и 401 (Unauthorized) и 403 (Forbidden/CSRF Failed)
     if (
+      originalRequest &&
       (error.response?.status === 401 || error.response?.status === 403) &&
       !originalRequest._retry
     ) {

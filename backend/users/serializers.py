@@ -5,7 +5,7 @@ from django.utils import timezone
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
 
-from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
+from .models import CustomUser, PhoneBan, Shop, ShopModerationRequest, SMSCode
 
 
 class HybridTokenSerializer(TokenObtainPairSerializer):
@@ -22,6 +22,15 @@ class HybridTokenSerializer(TokenObtainPairSerializer):
             phone = normalize_ru_mobile_phone(attrs.get("phone_number"))
         except PhoneValidationError as exc:
             raise serializers.ValidationError({"phone_number": str(exc)}) from exc
+        if PhoneBan.is_phone_banned(phone):
+            raise serializers.ValidationError(
+                {
+                    "detail": {
+                        "message": "Ваш номер телефона заблокирован.",
+                        "code": "user_blocked",
+                    }
+                }
+            )
         password = attrs.get("password")
         code = attrs.get("sms_code")
 

@@ -124,17 +124,10 @@ class CustomUser(
 
         from orders.models import Order, OrderItem
 
-        allowed_statuses = [
-            Order.Status.DELIVERING,
-            Order.Status.READY_FOR_PICKUP,
-            Order.Status.COMPLETED,
-            Order.Status.PAID,
-        ]
-
         return OrderItem.objects.filter(
             order__user_id=self.id,
             product_variant_id=variant.pk,
-            order__status__in=allowed_statuses,
+            order__status=Order.Status.PAID,
         ).exists()
 
     def save(self, *args, **kwargs):
@@ -142,6 +135,45 @@ class CustomUser(
         self.email = (self.email or "").strip().lower() or None
 
         super().save(*args, **kwargs)
+
+
+class PhoneBan(DateTimeCreateMixin, DateTimeUpdateMixin):
+    phone_number = PhoneNumberField(
+        unique=True,
+        region="RU",
+        verbose_name="Номер телефона",
+    )
+    reason = models.TextField("Причина блокировки", blank=True, max_length=1000)
+    is_active = models.BooleanField("Активна", default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="created_phone_bans",
+        verbose_name="Кто заблокировал",
+    )
+
+    class Meta:
+        ordering = ["-date_time_create", "-pk"]
+        verbose_name = "Блокировка телефона"
+        verbose_name_plural = "Блокировки телефонов"
+        indexes = [models.Index(fields=["phone_number", "is_active"])]
+
+    def save(self, *args, **kwargs):
+        self.phone_number = validate_ru_mobile_phone(self.phone_number)
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def is_phone_banned(cls, phone_number):
+        normalized_phone = validate_ru_mobile_phone(phone_number)
+        return cls.objects.filter(
+            phone_number=normalized_phone,
+            is_active=True,
+        ).exists()
+
+    def __str__(self):
+        return str(self.phone_number)
 
 
 class UserSegment(models.Model):

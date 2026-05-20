@@ -1,9 +1,9 @@
-from django.contrib import admin
+from django.contrib import admin, messages
 from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
 from import_export.admin import ImportExportModelAdmin
 
 from .forms import CustomUserChangeForm, CustomUserCreationForm
-from .models import CustomUser, Shop, ShopModerationRequest, SMSCode
+from .models import CustomUser, PhoneBan, Shop, ShopModerationRequest, SMSCode
 
 
 @admin.register(CustomUser)
@@ -34,7 +34,7 @@ class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
     ordering = ("-date_time_create",)
     list_per_page = 25
     date_hierarchy = "date_time_create"
-    actions = ("block_users", "unblock_users")
+    actions = ("block_users", "unblock_users", "ban_phone_numbers")
 
     readonly_fields = ("date_time_create", "date_time_update", "last_login")
 
@@ -45,6 +45,31 @@ class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
     @admin.action(description="Разблокировать выбранных пользователей")
     def unblock_users(self, request, queryset):
         queryset.update(is_active=True)
+
+    @admin.action(description="Забанить выбранные номера телефонов")
+    def ban_phone_numbers(self, request, queryset):
+        if not request.user.is_superuser:
+            self.message_user(
+                request,
+                "Бан по телефону доступен только суперпользователю.",
+                level=messages.ERROR,
+            )
+            return
+        created = 0
+        for user in queryset.exclude(is_superuser=True):
+            _, was_created = PhoneBan.objects.update_or_create(
+                phone_number=user.phone_number,
+                defaults={
+                    "is_active": True,
+                    "created_by": request.user,
+                    "reason": "Заблокирован через список пользователей.",
+                },
+            )
+            created += int(was_created)
+        self.message_user(
+            request,
+            f"Активных блокировок телефонов: {queryset.count()}. Новых: {created}.",
+        )
 
     def get_fieldsets(self, request, obj=None):
         """Убрать раздел пароля для не-суперпользователей."""
@@ -73,6 +98,39 @@ class CustomUserAdmin(ImportExportModelAdmin, BaseUserAdmin):
                 form.base_fields = {k: v for k, v in form.base_fields.items() if k != 'password'}
         
         return form
+
+
+@admin.register(PhoneBan)
+class PhoneBanAdmin(admin.ModelAdmin):
+    list_display = (
+        "phone_number",
+        "is_active",
+        "created_by",
+        "date_time_create",
+    )
+    list_filter = ("is_active", "date_time_create")
+    search_fields = ("phone_number", "reason")
+    readonly_fields = ("created_by", "date_time_create", "date_time_update")
+
+    def has_module_permission(self, request):
+        return request.user.is_superuser
+
+    def has_view_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_add_permission(self, request):
+        return request.user.is_superuser
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.created_by = request.user
+        super().save_model(request, obj, form, change)
 
 
 @admin.register(Shop)

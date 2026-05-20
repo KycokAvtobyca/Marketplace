@@ -315,6 +315,7 @@ class CatalogItemRequestAdmin(admin.ModelAdmin):
         "created_product_type",
         "created_category",
         "created_product_tag",
+        "created_brand",
         "date_time_create",
         "date_time_update",
     )
@@ -343,6 +344,7 @@ class CatalogItemRequestAdmin(admin.ModelAdmin):
                 "created_product_type",
                 "created_category",
                 "created_product_tag",
+                "created_brand",
             )
         )
         if request.user.is_superuser:
@@ -357,7 +359,15 @@ class CatalogItemRequestAdmin(admin.ModelAdmin):
         if not request.user.is_superuser:
             fields.extend(["status", "admin_comment"])
             if obj:
-                fields.extend(["target_type", "name", "parent_category", "comment"])
+                fields.extend([
+                    "target_type",
+                    "name",
+                    "parent_category",
+                    "brand_description",
+                    "brand_image",
+                    "attribute_values_text",
+                    "comment",
+                ])
         return tuple(dict.fromkeys(fields))
 
     def has_module_permission(self, request):

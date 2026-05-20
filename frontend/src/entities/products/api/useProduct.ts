@@ -11,9 +11,10 @@ export interface ProductImage {
 export interface ProductVariant {
   id: number
   sku: string
-  final_price: number
+  final_price: number | string
+  old_price: number | string
   has_discount: boolean
-  discount_pct: number
+  discount_pct: number | string
   stock: number
   is_active: boolean
   is_main: boolean

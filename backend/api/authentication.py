@@ -1,5 +1,6 @@
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
+from users.models import PhoneBan
 
 
 class HttpOnlyJWTAuthentication(JWTAuthentication):
@@ -18,6 +19,14 @@ class HttpOnlyJWTAuthentication(JWTAuthentication):
                 raise AuthenticationFailed(
                     {
                         "message": "Ваш аккаунт заблокирован.",
+                        "code": "user_blocked",
+                    },
+                    code="user_blocked",
+                )
+            if PhoneBan.is_phone_banned(user.phone_number):
+                raise AuthenticationFailed(
+                    {
+                        "message": "Ваш номер телефона заблокирован.",
                         "code": "user_blocked",
                     },
                     code="user_blocked",

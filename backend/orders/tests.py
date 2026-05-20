@@ -1,15 +1,17 @@
 from decimal import Decimal
 from unittest.mock import patch
 
+from carts.models import Cart, CartItem
 from catalog.models import Product, ProductVariant
 from django.contrib import admin
 from django.core.exceptions import ValidationError
 from django.http import HttpResponse
 from django.test import Client, TestCase
+from rest_framework.test import APIClient
 from types import SimpleNamespace
 from users.models import CustomUser, Shop
 
-from .models import Order, OrderItem
+from .models import Order, OrderItem, PickupPoint
 from .admin import OrderAdmin
 
 
@@ -154,3 +156,31 @@ class AdminPdfReportTests(TestCase):
                 SimpleNamespace(changed_data=["status"]),
                 True,
             )
+
+    def test_seller_cannot_create_order_with_own_product(self):
+        PickupPoint.objects.get_or_create(
+            code=Order.PickUpBranches.LENINA_5A,
+            defaults={
+                "name": "Lenina",
+                "address": "Lenina 5A",
+                "is_active": True,
+            },
+        )
+        cart, _ = Cart.objects.get_or_create(user=self.seller)
+        CartItem.objects.create(cart=cart, product_variant=self.variant, quantity=1)
+
+        client = APIClient()
+        client.force_authenticate(user=self.seller)
+        response = client.post(
+            "/api/v1/orders/create/",
+            {
+                "delivery_type": Order.DeliveryType.PICKUP,
+                "branch": Order.PickUpBranches.LENINA_5A,
+                "name": "Иван",
+                "phone_number": "+79642297622",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("cart", response.data)

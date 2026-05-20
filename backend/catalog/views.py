@@ -293,9 +293,11 @@ class ProductViewSet(CategoryTreeOptimizerMixin, viewsets.ReadOnlyModelViewSet):
             prefetches.append(
                 Prefetch(
                     "variants",
-                    queryset=m.ProductVariant.objects.filter(
-                        is_active=True
-                    ).prefetch_related("attribute_values__attribute"),
+                    queryset=m.ProductVariant.objects.with_prices(
+                        user=self.request.user
+                    )
+                    .filter(is_active=True)
+                    .prefetch_related("attribute_values__attribute"),
                 )
             )
 
@@ -409,6 +411,7 @@ class CatalogItemRequestViewSet(viewsets.ModelViewSet):
             "created_product_type",
             "created_category",
             "created_product_tag",
+            "created_brand",
         ).order_by("-date_time_create", "-id")
 
         user = self.request.user

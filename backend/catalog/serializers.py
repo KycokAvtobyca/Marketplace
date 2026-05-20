@@ -74,9 +74,17 @@ class CategorySerializer(serializers.ModelSerializer):
 
 
 class BrandSerializer(serializers.ModelSerializer):
+    image = serializers.SerializerMethodField()
+
     class Meta:
         model = Brand
         exclude = ["id"]
+
+    def get_image(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
 
 
 class ProductTagsSerializer(serializers.ModelSerializer):
@@ -144,6 +152,9 @@ class CatalogItemRequestSerializer(serializers.ModelSerializer):
             "name",
             "parent_category",
             "parent_category_name",
+            "brand_description",
+            "brand_image",
+            "attribute_values_text",
             "comment",
             "status",
             "status_display",
@@ -214,6 +225,9 @@ class ProductVariantSerializer(serializers.ModelSerializer):
     # Эти поля будут браться из аннотаций QuerySet или из @property модели
     final_price = serializers.DecimalField(
         max_digits=10, decimal_places=2, read_only=True
+    )
+    old_price = serializers.DecimalField(
+        source="price", max_digits=10, decimal_places=2, read_only=True
     )
     has_discount = serializers.BooleanField(read_only=True)
     discount_pct = serializers.DecimalField(

@@ -80,6 +80,14 @@ const toDeliveryDateTime = (time: string) => {
   return date.toISOString()
 }
 
+const phoneForRuMask = (value?: string) => {
+  const digits = (value || "").replace(/\D/g, "")
+  if (digits.length === 11 && (digits.startsWith("7") || digits.startsWith("8"))) {
+    return digits.slice(1)
+  }
+  return digits
+}
+
 export default function CheckoutPage() {
   const router = useRouter()
   const { data: cart, isLoading: cartLoading } = useGetCart()
@@ -112,7 +120,7 @@ export default function CheckoutPage() {
       setFormData((prev) => ({
         ...prev,
         name: prev.name || profile.name || "",
-        phone_number: prev.phone_number || profile.phone_number || "",
+        phone_number: prev.phone_number || phoneForRuMask(profile.phone_number),
         address: prev.address || profile.address || "",
       }))
     }
@@ -236,7 +244,7 @@ export default function CheckoutPage() {
                 <PhoneInput
                   value={formData.phone_number}
                   onChange={(val) =>
-                    setFormData({ ...formData, phone_number: val })
+                    setFormData({ ...formData, phone_number: phoneForRuMask(val) })
                   }
                   error={fieldErrors.phone_number}
                   hideLabel

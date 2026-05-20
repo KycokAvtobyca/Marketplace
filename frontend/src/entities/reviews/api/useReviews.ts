@@ -34,6 +34,12 @@ export interface ProductQuestion {
   answered_by_name: string
   answered_at: string | null
   is_public: boolean
+  question_status: "PENDING" | "APPROVED" | "REJECTED"
+  question_status_display: string
+  answer_status: "NONE" | "PENDING" | "APPROVED" | "REJECTED"
+  answer_status_display: string
+  moderation_status?: { status: string; label: string } | null
+  answer_moderation_status?: { status: string; label: string } | null
   date_time_create: string
 }
 

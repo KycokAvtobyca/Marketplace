@@ -37,6 +37,9 @@ const formatPrice = (value: number) =>
     maximumFractionDigits: 2,
   })
 
+const firstError = (value?: string | string[]) =>
+  Array.isArray(value) ? value[0] : value
+
 const getVariantLabel = (
   variant: { sku: string; attribute_values: Array<{ name: string }> },
   maxLength = 34,
@@ -89,6 +92,7 @@ export default function ProductPage() {
   const [currentImageIndex, setCurrentImageIndex] = useState(0)
   const [touchStart, setTouchStart] = useState<number | null>(null)
   const [quantity, setQuantity] = useState(1)
+  const [cartMessage, setCartMessage] = useState("")
   const [reviewRating, setReviewRating] = useState(5)
   const [reviewText, setReviewText] = useState("")
   const [reviewMessage, setReviewMessage] = useState("")
@@ -134,6 +138,16 @@ export default function ProductPage() {
     !!profile &&
     !!product?.shop &&
     (profile.is_superuser || profile.id === product.shop.owner)
+  const isOwnProduct = !!profile && !!product?.shop && profile.id === product.shop.owner
+  const activeVariantPrice = activeVariant
+    ? Number(activeVariant.final_price)
+    : null
+  const activeVariantOldPrice =
+    activeVariant?.old_price !== undefined ? Number(activeVariant.old_price) : null
+  const activeVariantHasDiscount =
+    activeVariantPrice !== null &&
+    activeVariantOldPrice !== null &&
+    activeVariantOldPrice > activeVariantPrice
 
   const handlePrevImage = useCallback(() => {
     setCurrentImageIndex((prev) => (prev > 0 ? prev - 1 : allImages.length - 1))
@@ -172,15 +186,29 @@ export default function ProductPage() {
   }
 
   const handleAddToCart = () => {
+    setCartMessage("")
     if (!activeVariant) return
     if (!profile) {
       toggleAuthWindow()
       return
     }
+    if (isOwnProduct) {
+      setCartMessage("Нельзя добавить свой товар в корзину.")
+      return
+    }
     addToCart(
       { product_variant_id: activeVariant.id, quantity },
       {
-        onSuccess: () => {
+        onSuccess: (result) => {
+          if (!result.success) {
+            setCartMessage(
+              firstError(result.error?.data.error) ||
+                firstError(result.error?.data.detail) ||
+                "Не удалось добавить товар в корзину.",
+            )
+            return
+          }
+          setCartMessage("Товар добавлен в корзину.")
           queryClient.invalidateQueries({ queryKey: ["cart"] })
         },
       },
@@ -285,7 +313,7 @@ export default function ProductPage() {
     createQuestion(questionText, {
       onSuccess: () => {
         setQuestionText("")
-        setQuestionMessage("Вопрос отправлен продавцу.")
+        setQuestionMessage("Вопрос отправлен на модерацию.")
       },
       onError: () => {
         setQuestionMessage("Не удалось отправить вопрос.")
@@ -494,16 +522,11 @@ export default function ProductPage() {
               <div>
                 <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
                   <span className="text-2xl font-black text-brand-main sm:text-3xl">
-                    {formatPrice(Number(activeVariant.final_price))} ₽
+                    {formatPrice(activeVariantPrice ?? 0)} ₽
                   </span>
-                  {activeVariant.has_discount && (
+                  {activeVariantHasDiscount && (
                     <span className="text-lg text-slate-400 line-through">
-                      {formatPrice(
-                        Number(
-                          activeVariant.final_price /
-                            (1 - (activeVariant.discount_pct || 0) / 100),
-                        ),
-                      )}{" "}
+                      {formatPrice(activeVariantOldPrice ?? 0)}{" "}
                       ₽
                     </span>
                   )}
@@ -537,6 +560,11 @@ export default function ProductPage() {
                     </button>
                   ))}
                 </div>
+                {activeVariant && (
+                  <p className="mt-2 text-xs text-slate-500">
+                    Выбранный артикул: {activeVariant.sku}
+                  </p>
+                )}
               </div>
             )}
 
@@ -617,11 +645,15 @@ export default function ProductPage() {
               <button
                 onClick={handleAddToCart}
                 disabled={
-                  isAdding || !activeVariant || activeVariant.stock <= 0
+                  isAdding || !activeVariant || activeVariant.stock <= 0 || isOwnProduct
                 }
                 className="w-full rounded-xl bg-brand-main py-3 font-bold text-white shadow-lg shadow-brand-main/20 transition-all hover:brightness-110 active:scale-[0.98] disabled:opacity-50 min-[420px]:flex-1"
               >
-                {isAdding ? "Добавление..." : "В корзину"}
+                {isOwnProduct
+                  ? "Свой товар нельзя купить"
+                  : isAdding
+                    ? "Добавление..."
+                    : "В корзину"}
               </button>
               <button
                 type="button"
@@ -636,6 +668,9 @@ export default function ProductPage() {
                 {isFavorite ? "В избранном" : "В избранное"}
               </button>
             </div>
+            {cartMessage && (
+              <p className="text-sm font-medium text-slate-500">{cartMessage}</p>
+            )}
 
             {product.description && (
               <div>
@@ -731,6 +766,11 @@ export default function ProductPage() {
                       "ru-RU",
                     )}
                   </p>
+                  {question.question_status !== "APPROVED" && (
+                    <p className="mt-2 inline-flex rounded-full bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700">
+                      {question.question_status_display || "Вопрос на модерации"}
+                    </p>
+                  )}
                   <p className="mt-2 text-sm text-slate-700">{question.text}</p>
                   {question.answer ? (
                     <div className="mt-3 rounded-xl bg-slate-50 p-3 text-sm">
@@ -739,12 +779,19 @@ export default function ProductPage() {
                       </p>
                       <p className="mt-1 text-slate-600">{question.answer}</p>
                     </div>
+                  ) : canAnswerQuestions && question.answer_status === "PENDING" ? (
+                    <p className="mt-3 text-xs text-amber-600">
+                      Ответ продавца отправлен на модерацию.
+                    </p>
                   ) : (
                     <p className="mt-3 text-xs text-slate-400">
                       Продавец еще не ответил.
                     </p>
                   )}
-                  {canAnswerQuestions && !question.answer && (
+                  {canAnswerQuestions &&
+                    question.question_status === "APPROVED" &&
+                    question.answer_status !== "PENDING" &&
+                    !question.answer && (
                     <div className="mt-3 flex flex-col gap-2 min-[520px]:flex-row">
                       <input
                         value={answerDrafts[question.id] || ""}
@@ -759,10 +806,19 @@ export default function ProductPage() {
                       />
                       <button
                         onClick={() =>
-                          answerQuestion({
-                            id: question.id,
-                            answer: answerDrafts[question.id] || "",
-                          })
+                          answerQuestion(
+                            {
+                              id: question.id,
+                              answer: answerDrafts[question.id] || "",
+                            },
+                            {
+                              onSuccess: () =>
+                                setAnswerDrafts((prev) => ({
+                                  ...prev,
+                                  [question.id]: "",
+                                })),
+                            },
+                          )
                         }
                         disabled={
                           isAnsweringQuestion ||
